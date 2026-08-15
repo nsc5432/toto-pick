@@ -1,0 +1,66 @@
+.baseball-grid {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px;
+  font-family: system-ui, sans-serif;
+  text-align: left;
+}
+
+.baseball-grid__error {
+  color: #c0392b;
+}
+
+.baseball-grid__table-wrap {
+  overflow-x: auto;
+}
+
+.baseball-grid__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.baseball-grid__table th,
+.baseball-grid__table td {
+  border: 1px solid #ddd;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+
+.baseball-grid__table th {
+  background: #f5f5f5;
+  text-align: center;
+}
+
+.baseball-grid__table td {
+  text-align: right;
+}
+
+.baseball-grid__table td:nth-child(-n + 8),
+.baseball-grid__table td:nth-child(9) {
+  text-align: center;
+}
+
+.baseball-grid__empty {
+  text-align: center !important;
+  padding: 24px;
+  color: #888;
+}
+
+.baseball-grid__pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.baseball-grid__pager button {
+  padding: 6px 16px;
+  cursor: pointer;
+}
+
+.baseball-grid__pager button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}

@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: baseballApi
+  datasource:
+    url: jdbc:mysql://localhost:3306/kbo?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: root
+    password: kbo12!@
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false

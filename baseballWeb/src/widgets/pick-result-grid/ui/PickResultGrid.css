@@ -1,0 +1,65 @@
+.pick-result-grid {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px;
+  font-family: system-ui, sans-serif;
+  text-align: left;
+}
+
+.pick-result-grid__error {
+  color: #c0392b;
+}
+
+.pick-result-grid__table-wrap {
+  overflow-x: auto;
+}
+
+.pick-result-grid__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.pick-result-grid__table th,
+.pick-result-grid__table td {
+  border: 1px solid #ddd;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+
+.pick-result-grid__table th {
+  background: #f5f5f5;
+  text-align: center;
+}
+
+.pick-result-grid__table td {
+  text-align: right;
+}
+
+.pick-result-grid__table td:nth-child(-n + 3) {
+  text-align: center;
+}
+
+.pick-result-grid__empty {
+  text-align: center !important;
+  padding: 24px;
+  color: #888;
+}
+
+.pick-result-grid__pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.pick-result-grid__pager button {
+  padding: 6px 16px;
+  cursor: pointer;
+}
+
+.pick-result-grid__pager button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}

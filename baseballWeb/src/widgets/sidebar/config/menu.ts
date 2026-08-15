@@ -3,4 +3,7 @@ export interface MenuItem {
   path: string;
 }
 
-export const menuItems: MenuItem[] = [{ label: "경기결과 조회", path: "/baseball-results" }];
+export const menuItems: MenuItem[] = [
+  { label: "경기결과 조회", path: "/baseball-results" },
+  { label: "시뮬레이션 결과 조회", path: "/pick-results" },
+];

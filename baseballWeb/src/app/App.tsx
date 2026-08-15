@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import { BaseballResultPage } from "@/pages/baseball-result";
+import { PickResultPage } from "@/pages/pick-result";
 import { Sidebar } from "@/widgets/sidebar";
 
 import "./App.css";
@@ -13,6 +14,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/baseball-results" replace />} />
           <Route path="/baseball-results" element={<BaseballResultPage />} />
+          <Route path="/pick-results" element={<PickResultPage />} />
         </Routes>
       </main>
     </div>

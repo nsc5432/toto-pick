@@ -19,7 +19,10 @@ public record BaseballResultResponse(
         Double totalDiv,
         Double homeDiv,
         Double drawDiv,
-        Double awayDiv) {
+        Double awayDiv,
+        Double pubHomeDiv,
+        Double pubDrawDiv,
+        Double pubAwayDiv) {
 
     public static BaseballResultResponse from(BaseballResult baseballResult) {
         return new BaseballResultResponse(
@@ -39,6 +42,9 @@ public record BaseballResultResponse(
                 baseballResult.totalDiv(),
                 baseballResult.homeDiv(),
                 baseballResult.drawDiv(),
-                baseballResult.awayDiv());
+                baseballResult.awayDiv(),
+                baseballResult.pubHomeDiv(),
+                baseballResult.pubDrawDiv(),
+                baseballResult.pubAwayDiv());
     }
 }

@@ -5,10 +5,11 @@ import java.util.Comparator;
 import java.util.List;
 
 import com.toto.baseballApi.baseballresult.domain.BaseballResult;
+import com.toto.baseballApi.baseballresult.domain.ThreeWayOdds;
 
 /**
- * Favorite-backing baseline strategy over 3-way ("야구 승1패") games: for every day game with both
- * home and away win odds, back whichever side the market favors (the lower odds). Candidates are
+ * Favorite-backing baseline strategy over 3-way ("야구 승1패") games: for every day game with
+ * published odds, back whichever side the market favors (the lower odds). Candidates are
  * sorted by the predicted side's odds ascending and chunked into slips of exactly
  * {@code combinedN}; the trailing incomplete chunk is discarded. Ignores {@code num}/{@code x}/
  * {@code y} — it needs no history. Exists as the market-consensus baseline the other algorithms
@@ -37,7 +38,9 @@ public class FavoriteOddsSlipAlgorithm implements TunableAlgorithm {
 
     @Override
     public ParamSpace paramSpace() {
-        return ParamSpace.of(new ParamSpec(AlgorithmParams.COMBINED_N, 2, 5, 1, 3));
+        // 2~3 legs only (설계 결정 D1) — a baseline swept over leg counts the real candidates are
+        // barred from would not be the same comparison.
+        return ParamSpace.of(new ParamSpec(AlgorithmParams.COMBINED_N, 2, 3, 1, 3));
     }
 
     @Override
@@ -47,14 +50,15 @@ public class FavoriteOddsSlipAlgorithm implements TunableAlgorithm {
 
         List<Candidate> candidates = new ArrayList<>();
         for (BaseballResult game : input.dayGames()) {
-            if (game.homeDiv() == null || game.awayDiv() == null || game.homeDiv().equals(game.awayDiv())) {
+            ThreeWayOdds odds = game.publishedOdds();
+            if (odds == null || odds.home() == odds.away()) {
                 continue;
             }
-            boolean homeFavored = game.homeDiv() < game.awayDiv();
+            boolean homeFavored = odds.home() < odds.away();
             candidates.add(new Candidate(
                     game.id(),
                     homeFavored ? HOME_WIN : AWAY_WIN,
-                    homeFavored ? game.homeDiv() : game.awayDiv()));
+                    homeFavored ? odds.home() : odds.away()));
         }
 
         List<Candidate> sorted = candidates.stream()

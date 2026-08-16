@@ -19,7 +19,7 @@ import com.toto.baseballApi.research.domain.ExperimentGoal;
 public record ResearchProperties(Goal goal, Search search, Ledger ledger) {
 
     public ResearchProperties {
-        goal = goal == null ? new Goal(null, null, null, null, null) : goal;
+        goal = goal == null ? new Goal(null, null, null, null, null, null, null, null, null, null) : goal;
         search = search == null ? new Search(null, null, null, null) : search;
         ledger = ledger == null ? new Ledger(null) : ledger;
     }
@@ -27,25 +27,47 @@ public record ResearchProperties(Goal goal, Search search, Ledger ledger) {
     /**
      * The target a candidate must clear on the validation window.
      *
-     * @param minHitRate  optional; skipped when absent
-     * @param maxDrawdown optional; skipped when absent
+     * @param minExcessReturn       the standing target: leg-level excess over the market's own
+     *                              expectation. Defaults to +0.02 — a practical-relevance floor, so
+     *                              a statistically clean but negligible edge is not called a find
+     * @param minExcessTStat        significance of that edge; defaults to 2.0 rather than off,
+     *                              because an excess floor alone is clearable by noise at these
+     *                              sample sizes
+     * @param targetProfitRate      optional absolute ROI floor; unset by default
+     * @param minHitRate            optional; skipped when absent
+     * @param maxDrawdown           optional; skipped when absent
+     * @param maxTrainValidationGap stability guard; defaults on rather than off, because a target
+     *                              with no stability guard is passable by a lucky tail alone
+     * @param minProfitableSegments optional; skipped when absent
      */
     public record Goal(
             BigDecimal targetProfitRate,
             Integer minSlipCount,
             Integer minBettingDayCount,
             BigDecimal minHitRate,
-            BigDecimal maxDrawdown) {
+            BigDecimal maxDrawdown,
+            BigDecimal maxTrainValidationGap,
+            Integer minProfitableSegments,
+            BigDecimal minExcessReturn,
+            BigDecimal minExcessTStat,
+            BigDecimal maxTrainValidationGapTStat) {
 
         public Goal {
-            targetProfitRate = targetProfitRate == null ? new BigDecimal("0.10") : targetProfitRate;
             minSlipCount = minSlipCount == null ? 100 : minSlipCount;
             minBettingDayCount = minBettingDayCount == null ? 20 : minBettingDayCount;
+            maxTrainValidationGapTStat = maxTrainValidationGapTStat == null
+                    ? new BigDecimal("2.0") : maxTrainValidationGapTStat;
+            if (targetProfitRate == null && minExcessReturn == null) {
+                minExcessReturn = new BigDecimal("0.02");
+            }
+            minExcessTStat = minExcessTStat == null ? new BigDecimal("2.0") : minExcessTStat;
         }
 
         public ExperimentGoal toDomain() {
             return new ExperimentGoal(
-                    targetProfitRate, minSlipCount, minBettingDayCount, minHitRate, maxDrawdown);
+                    targetProfitRate, minSlipCount, minBettingDayCount, minHitRate, maxDrawdown,
+                    maxTrainValidationGap, minProfitableSegments, minExcessReturn, minExcessTStat,
+                    maxTrainValidationGapTStat);
         }
     }
 

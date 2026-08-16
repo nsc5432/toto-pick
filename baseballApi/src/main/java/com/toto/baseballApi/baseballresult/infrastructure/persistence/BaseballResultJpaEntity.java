@@ -68,6 +68,15 @@ class BaseballResultJpaEntity {
     @Column(name = "AWAY_DIV")
     private Double awayDiv;
 
+    @Column(name = "PUB_HOME_DIV")
+    private Double pubHomeDiv;
+
+    @Column(name = "PUB_DRAW_DIV")
+    private Double pubDrawDiv;
+
+    @Column(name = "PUB_AWAY_DIV")
+    private Double pubAwayDiv;
+
     /**
      * Package-private on purpose: the entity stays setter-free for the outside world;
      * only the repository adapter in this package may apply computed odds.

@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Set;
 
 import com.toto.baseballApi.baseballresult.domain.BaseballResult;
+import com.toto.baseballApi.baseballresult.domain.ThreeWayOdds;
 
 /**
  * Win-rate vs. odds mismatch strategy over 3-way ("야구 승1패") games.
@@ -56,8 +57,9 @@ public class WinRateOddsSlipSelector implements TunableAlgorithm {
                 new ParamSpec(AlgorithmParams.X, 1.4, 3.0, 0.1, 1.8),
                 // Fade a weak team only while the market prices it at or under y.
                 new ParamSpec(AlgorithmParams.Y, 1.4, 3.0, 0.1, 2.5),
-                // Legs per slip: more legs multiply the payout and shrink the hit rate.
-                new ParamSpec(AlgorithmParams.COMBINED_N, 2, 5, 1, 3));
+                // Legs per slip: more legs multiply the payout and shrink the hit rate — capped at
+                // 3 by 설계 결정 D1, since each extra leg raises the per-leg edge the goal demands.
+                new ParamSpec(AlgorithmParams.COMBINED_N, 2, 3, 1, 3));
     }
 
     @Override
@@ -110,28 +112,27 @@ public class WinRateOddsSlipSelector implements TunableAlgorithm {
     }
 
     private Candidate toCandidate(BaseballResult game, TeamRankSets rankSets, double x, double y) {
+        ThreeWayOdds odds = game.publishedOdds();
+        if (odds == null) {
+            return null;
+        }
+
         Set<String> predictions = new LinkedHashSet<>();
-        collectPredictions(predictions, rankSets, game.home(), game.homeDiv(), true, x, y);
-        collectPredictions(predictions, rankSets, game.away(), game.awayDiv(), false, x, y);
+        collectPredictions(predictions, rankSets, game.home(), odds.home(), true, x, y);
+        collectPredictions(predictions, rankSets, game.away(), odds.away(), false, x, y);
         if (predictions.size() != 1) {
             // No signal, or the two teams' signals contradict each other — skip the game.
             return null;
         }
 
         String predicted = predictions.iterator().next();
-        Double predictedSideOdds = HOME_WIN.equals(predicted) ? game.homeDiv() : game.awayDiv();
-        if (predictedSideOdds == null) {
-            return null;
-        }
-        return new Candidate(game.id(), predicted, predictedSideOdds);
+        return new Candidate(
+                game.id(), predicted, HOME_WIN.equals(predicted) ? odds.home() : odds.away());
     }
 
     private void collectPredictions(
             Set<String> predictions, TeamRankSets rankSets,
-            String team, Double winOdds, boolean isHome, double x, double y) {
-        if (winOdds == null) {
-            return;
-        }
+            String team, double winOdds, boolean isHome, double x, double y) {
         if (rankSets.top().contains(team) && winOdds >= x) {
             predictions.add(isHome ? HOME_WIN : AWAY_WIN);
         }

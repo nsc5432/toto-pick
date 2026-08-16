@@ -99,6 +99,9 @@ class BaseballResultRepositoryImpl implements BaseballResultRepository {
                 entity.getTotalDiv(),
                 entity.getHomeDiv(),
                 entity.getDrawDiv(),
-                entity.getAwayDiv());
+                entity.getAwayDiv(),
+                entity.getPubHomeDiv(),
+                entity.getPubDrawDiv(),
+                entity.getPubAwayDiv());
     }
 }

@@ -178,7 +178,7 @@ public class AlgorithmSearchService {
                 train,
                 validation,
                 ObjectiveScore.of(validation, goal.minSlipCount()),
-                goal.evaluate(validation),
+                goal.evaluate(train, validation),
                 command.settings().inputMoney().toPlainString(),
                 command.seed(),
                 command.note());
@@ -240,8 +240,9 @@ public class AlgorithmSearchService {
         BacktestMetrics validation = leader.validationMetrics();
 
         if (leader.verdict().achieved()) {
-            lines.add("목표 달성: %s (%s) 검증 수익률 %s, 조합 %d건. POST /api/picks/simulate 로 확정 시뮬레이션을 남기세요."
+            lines.add("목표 달성: %s (%s) 검증 초과수익 %s (수익률 %s), 조합 %d건. POST /api/picks/simulate 로 확정 시뮬레이션을 남기세요."
                     .formatted(leader.algorithmCode(), leader.paramSignature(),
+                            validation.legExcessReturnOrZero().toPlainString(),
                             validation.profitRateOrZero().toPlainString(), validation.slipCount()));
             return lines;
         }
@@ -255,31 +256,31 @@ public class AlgorithmSearchService {
                     .formatted(validation.slipCount(), goal.minSlipCount()));
         }
 
-        BigDecimal gap = leader.trainMetrics().profitRateOrZero()
-                .subtract(validation.profitRateOrZero());
+        BigDecimal gap = leader.trainMetrics().legExcessReturnOrZero()
+                .subtract(validation.legExcessReturnOrZero()).abs();
         if (gap.compareTo(OVERFIT_GAP) > 0) {
-            lines.add("과최적화 의심: 학습 %s vs 검증 %s (격차 %s). 격자를 좁히거나 기간을 늘려 재검증하세요."
-                    .formatted(leader.trainMetrics().profitRateOrZero().toPlainString(),
-                            validation.profitRateOrZero().toPlainString(), gap.toPlainString()));
+            lines.add("학습·검증 불일치: 초과수익 학습 %s vs 검증 %s (격차 %s). 한쪽 구간이 특이했다는 뜻이므로, 격자를 좁히거나 기간을 늘려 재검증하세요."
+                    .formatted(leader.trainMetrics().legExcessReturnOrZero().toPlainString(),
+                            validation.legExcessReturnOrZero().toPlainString(), gap.toPlainString()));
         }
 
-        // A promising-looking rate on too few slips is not evidence the family works, so an
-        // unqualified candidate must not count toward "something here is profitable" — otherwise
+        // A promising-looking edge on too few slips is not evidence the family works, so an
+        // unqualified candidate must not count toward "something here has an edge" — otherwise
         // one lucky run suppresses the advice to go find a genuinely different signal.
         bestPerAlgorithm.stream()
                 .filter(e -> !e.score().qualified()
-                        && e.validationMetrics().profitRateOrZero().compareTo(BigDecimal.ZERO) > 0)
+                        && e.validationMetrics().legExcessReturnOrZero().compareTo(BigDecimal.ZERO) > 0)
                 .forEach(e -> lines.add(
-                        "%s (%s) 는 검증 수익률 %s 이나 조합 %d건(< %d)으로 실격입니다. 적중 %d건에 기댄 수치이므로 그대로 신뢰하지 말고, 기간을 늘리거나 필터를 완화해 표본을 확보한 뒤 재검증하세요."
+                        "%s (%s) 는 검증 초과수익 %s 이나 조합 %d건(< %d)으로 실격입니다. 적중 %d건에 기댄 수치이므로 그대로 신뢰하지 말고, 기간을 늘리거나 필터를 완화해 표본을 확보한 뒤 재검증하세요."
                                 .formatted(e.algorithmCode(), e.paramSignature(),
-                                        e.validationMetrics().profitRateOrZero().toPlainString(),
+                                        e.validationMetrics().legExcessReturnOrZero().toPlainString(),
                                         e.validationMetrics().slipCount(), goal.minSlipCount(),
                                         e.validationMetrics().hitCount())));
 
-        boolean noQualifiedProfit = bestPerAlgorithm.stream().noneMatch(e -> e.score().qualified()
-                && e.validationMetrics().profitRateOrZero().compareTo(BigDecimal.ZERO) > 0);
-        if (noQualifiedProfit) {
-            lines.add("표본 기준을 통과한 후보 중 검증 구간 수익이 양(+)인 계열이 없습니다. 기존 계열의 파라미터 재탐색보다 새로운 신호 계열(도출 방법)을 추가하는 편이 낫습니다.");
+        boolean noQualifiedEdge = bestPerAlgorithm.stream().noneMatch(e -> e.score().qualified()
+                && e.validationMetrics().legExcessReturnOrZero().compareTo(BigDecimal.ZERO) > 0);
+        if (noQualifiedEdge) {
+            lines.add("표본 기준을 통과한 후보 중 검증 구간 초과수익이 양(+)인 계열이 없습니다 — 어느 계열도 배당이 모르는 정보를 담고 있지 않다는 뜻입니다. 기존 계열의 파라미터 재탐색보다 새로운 신호 계열(도출 방법)을 추가하는 편이 낫습니다.");
         }
 
         return lines;

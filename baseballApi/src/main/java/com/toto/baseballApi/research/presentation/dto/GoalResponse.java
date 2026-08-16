@@ -10,11 +10,18 @@ public record GoalResponse(
         int minSlipCount,
         int minBettingDayCount,
         BigDecimal minHitRate,
-        BigDecimal maxDrawdown) {
+        BigDecimal maxDrawdown,
+        BigDecimal maxTrainValidationGap,
+        Integer minProfitableSegments,
+        BigDecimal minExcessReturn,
+        BigDecimal minExcessTStat,
+        BigDecimal maxTrainValidationGapTStat) {
 
     public static GoalResponse from(ExperimentGoal goal) {
         return new GoalResponse(
                 goal.targetProfitRate(), goal.minSlipCount(), goal.minBettingDayCount(),
-                goal.minHitRate(), goal.maxDrawdown());
+                goal.minHitRate(), goal.maxDrawdown(),
+                goal.maxTrainValidationGap(), goal.minProfitableSegments(),
+                goal.minExcessReturn(), goal.minExcessTStat(), goal.maxTrainValidationGapTStat());
     }
 }

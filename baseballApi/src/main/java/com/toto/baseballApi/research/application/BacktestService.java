@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.toto.baseballApi.baseballresult.domain.BaseballResult;
 import com.toto.baseballApi.baseballresult.domain.BaseballResultRepository;
 import com.toto.baseballApi.pick.domain.AlgorithmParams;
+import com.toto.baseballApi.pick.domain.LegTally;
 import com.toto.baseballApi.pick.domain.PickAlgorithm;
 import com.toto.baseballApi.pick.domain.PickBacktester;
 import com.toto.baseballApi.pick.domain.PickUniverse;
@@ -127,13 +128,20 @@ public class BacktestService {
 
         int hits = 0;
         BigDecimal outputTotal = BigDecimal.ZERO;
+        BigDecimal benchmarkTotal = BigDecimal.ZERO;
+        LegTally legs = LegTally.EMPTY;
         for (SettledSlip slip : slips) {
             if (slip.hit()) {
                 hits++;
             }
             outputTotal = outputTotal.add(slip.outputMoney());
+            if (slip.benchmarkOutputMoney() != null) {
+                benchmarkTotal = benchmarkTotal.add(slip.benchmarkOutputMoney());
+            }
+            legs = legs.plus(slip.legs());
         }
         BigDecimal inputTotal = settings.inputMoney().multiply(BigDecimal.valueOf(slips.size()));
-        return new DayOutcome(day.ymd(), slips.size(), hits, inputTotal, outputTotal);
+        return new DayOutcome(
+                day.ymd(), slips.size(), hits, inputTotal, outputTotal, benchmarkTotal, legs);
     }
 }

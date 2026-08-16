@@ -52,14 +52,29 @@ public record ExperimentResponse(
             BigDecimal profitRate,
             BigDecimal hitRate,
             BigDecimal maxDrawdown,
-            int worstLosingStreak) {
+            int worstLosingStreak,
+            int segmentCount,
+            int profitableSegmentCount,
+            BigDecimal benchmarkOutputTotal,
+            BigDecimal excessReturn,
+            int legCount,
+            int legHitCount,
+            BigDecimal legReturnRate,
+            BigDecimal legBenchmarkRate,
+            BigDecimal legExcessReturn,
+            BigDecimal legExcessTStat) {
 
         static MetricsResponse from(BacktestMetrics metrics) {
             return metrics == null ? null : new MetricsResponse(
                     metrics.dayCount(), metrics.bettingDayCount(), metrics.slipCount(),
                     metrics.hitCount(), metrics.inputTotal(), metrics.outputTotal(),
                     metrics.profitRate(), metrics.hitRate(), metrics.maxDrawdown(),
-                    metrics.worstLosingStreak());
+                    metrics.worstLosingStreak(),
+                    metrics.segmentCount(), metrics.profitableSegmentCount(),
+                    metrics.benchmarkOutputTotal(), metrics.excessReturn(),
+                    metrics.legs().count(), metrics.legs().hitCount(),
+                    metrics.legs().returnRate(), metrics.legs().benchmarkRate(),
+                    metrics.legExcessReturn(), metrics.legs().excessTStat());
         }
     }
 
@@ -79,7 +94,7 @@ public record ExperimentResponse(
                 WindowResponse.from(experiment.validationWindow()),
                 MetricsResponse.from(experiment.trainMetrics()),
                 MetricsResponse.from(experiment.validationMetrics()),
-                experiment.score() == null ? null : experiment.score().profitRate(),
+                experiment.score() == null ? null : experiment.score().excessReturn(),
                 experiment.score() != null && experiment.score().qualified(),
                 verdict != null && verdict.achieved(),
                 verdict == null ? List.of() : verdict.checks().stream()

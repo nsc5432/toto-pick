@@ -33,7 +33,10 @@ public final class PickBacktester {
                     .map(s -> new PickDetail(null, s.resultId(), s.predictedTotalResult()))
                     .toList();
             settled.add(new SettledSlip(
-                    details, inputMoney, PickSettlement.settle(details, dayGamesById, inputMoney)));
+                    details, inputMoney,
+                    PickSettlement.settle(details, dayGamesById, inputMoney),
+                    PickSettlement.marketExpectation(details, dayGamesById, inputMoney),
+                    PickSettlement.legTally(details, dayGamesById)));
         }
         return settled;
     }

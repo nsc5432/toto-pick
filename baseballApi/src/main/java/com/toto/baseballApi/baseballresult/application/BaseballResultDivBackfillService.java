@@ -110,14 +110,18 @@ public class BaseballResultDivBackfillService {
         }
         double qHome;
         double qAway;
-        if (WIN.equals(twoWay.totalResult())) {
-            qHome = 1.0 / twoWayDiv;
-            qAway = TWO_WAY_OVERROUND - qHome;
-        } else if (LOSS.equals(twoWay.totalResult())) {
-            qAway = 1.0 / twoWayDiv;
-            qHome = TWO_WAY_OVERROUND - qAway;
-        } else {
-            return Optional.empty();
+        switch (twoWay.totalResult()) {
+            case WIN -> {
+                qHome = 1.0 / twoWayDiv;
+                qAway = TWO_WAY_OVERROUND - qHome;
+            }
+            case LOSS -> {
+                qAway = 1.0 / twoWayDiv;
+                qHome = TWO_WAY_OVERROUND - qAway;
+            }
+            default -> {
+                return Optional.empty();
+            }
         }
         if (qHome <= 0 || qAway <= 0) {
             return Optional.empty();
@@ -132,30 +136,35 @@ public class BaseballResultDivBackfillService {
         Double homeDiv;
         Double drawDiv;
         Double awayDiv;
-        if (WIN.equals(threeWay.totalResult())) {
-            double pHome = 1.0 / total;
-            double pAway = pHome / ratio;
-            homeDiv = total;
-            awayDiv = round2(1.0 / pAway);
-            drawDiv = estimateDrawDiv(THREE_WAY_OVERROUND - pHome - pAway);
-        } else if (LOSS.equals(threeWay.totalResult())) {
-            double pAway = 1.0 / total;
-            double pHome = pAway * ratio;
-            awayDiv = total;
-            homeDiv = round2(1.0 / pHome);
-            drawDiv = estimateDrawDiv(THREE_WAY_OVERROUND - pHome - pAway);
-        } else if (ONE_RUN_MARGIN.equals(threeWay.totalResult())) {
-            double remaining = THREE_WAY_OVERROUND - 1.0 / total;
-            if (remaining <= 0) {
+        switch (threeWay.totalResult()) {
+            case WIN -> {
+                double pHome = 1.0 / total;
+                double pAway = pHome / ratio;
+                homeDiv = total;
+                awayDiv = round2(1.0 / pAway);
+                drawDiv = estimateDrawDiv(THREE_WAY_OVERROUND - pHome - pAway);
+            }
+            case LOSS -> {
+                double pAway = 1.0 / total;
+                double pHome = pAway * ratio;
+                awayDiv = total;
+                homeDiv = round2(1.0 / pHome);
+                drawDiv = estimateDrawDiv(THREE_WAY_OVERROUND - pHome - pAway);
+            }
+            case ONE_RUN_MARGIN -> {
+                double remaining = THREE_WAY_OVERROUND - 1.0 / total;
+                if (remaining <= 0) {
+                    return Optional.empty();
+                }
+                double pHome = remaining * ratio / (1.0 + ratio);
+                double pAway = remaining / (1.0 + ratio);
+                drawDiv = total;
+                homeDiv = round2(1.0 / pHome);
+                awayDiv = round2(1.0 / pAway);
+            }
+            default -> {
                 return Optional.empty();
             }
-            double pHome = remaining * ratio / (1.0 + ratio);
-            double pAway = remaining / (1.0 + ratio);
-            drawDiv = total;
-            homeDiv = round2(1.0 / pHome);
-            awayDiv = round2(1.0 / pAway);
-        } else {
-            return Optional.empty();
         }
 
         // Updated rows must always carry home and away odds; skip the row entirely

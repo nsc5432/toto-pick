@@ -4,6 +4,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import com.toto.baseballApi.pick.domain.FavoriteOddsSlipAlgorithm;
+import com.toto.baseballApi.pick.domain.MarketEdgeSlipAlgorithm;
 import com.toto.baseballApi.pick.domain.PickAlgorithm;
 import com.toto.baseballApi.pick.domain.WinRateOddsSlipSelector;
 
@@ -24,5 +25,10 @@ class PickAlgorithmConfig {
     @Bean
     PickAlgorithm favoriteOddsAlgorithm() {
         return new FavoriteOddsSlipAlgorithm();
+    }
+
+    @Bean
+    PickAlgorithm marketEdgeAlgorithm() {
+        return new MarketEdgeSlipAlgorithm();
     }
 }

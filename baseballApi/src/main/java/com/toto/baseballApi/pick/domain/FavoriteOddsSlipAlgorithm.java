@@ -13,8 +13,12 @@ import com.toto.baseballApi.baseballresult.domain.BaseballResult;
  * {@code combinedN}; the trailing incomplete chunk is discarded. Ignores {@code num}/{@code x}/
  * {@code y} — it needs no history. Exists as the market-consensus baseline the other algorithms
  * have to beat.
+ *
+ * <p>{@code combinedN} is swept here too, so the baseline is measured at its own best leg count
+ * rather than at whatever the other algorithms happened to be run with. A strategy that only beats
+ * a handicapped baseline has not been shown to beat the market.
  */
-public class FavoriteOddsSlipAlgorithm implements PickAlgorithm {
+public class FavoriteOddsSlipAlgorithm implements TunableAlgorithm {
 
     public static final String CODE = "FAVORITE";
 
@@ -29,6 +33,11 @@ public class FavoriteOddsSlipAlgorithm implements PickAlgorithm {
     @Override
     public String name() {
         return "배당 우세팀";
+    }
+
+    @Override
+    public ParamSpace paramSpace() {
+        return ParamSpace.of(new ParamSpec(AlgorithmParams.COMBINED_N, 2, 5, 1, 3));
     }
 
     @Override

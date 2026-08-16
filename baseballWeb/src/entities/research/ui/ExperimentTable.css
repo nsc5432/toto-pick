@@ -1,0 +1,96 @@
+.experiment-table__wrap {
+  overflow-x: auto;
+}
+
+.experiment-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.experiment-table th,
+.experiment-table td {
+  border: 1px solid #ddd;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+
+.experiment-table th {
+  background: #f5f5f5;
+  text-align: center;
+}
+
+.experiment-table td {
+  text-align: right;
+}
+
+.experiment-table__sub {
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.experiment-table__name-cell {
+  text-align: left !important;
+  font-weight: 600;
+}
+
+.experiment-table__code {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  color: #888;
+}
+
+.experiment-table__params-cell {
+  text-align: left !important;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  color: #555;
+}
+
+/* 학습 구간 수치는 의도적으로 흐리게 — 성과로 인용할 값이 아니다. */
+.experiment-table__train-cell {
+  color: #999;
+}
+
+.experiment-table__cell--positive {
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.experiment-table__cell--negative {
+  color: #dc2626;
+}
+
+.experiment-table__cell--warn {
+  color: #b45309;
+  background: #fffbeb;
+}
+
+.experiment-table__row--achieved td {
+  background: #eff6ff;
+}
+
+.experiment-table__badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: #16a34a;
+  border-radius: 10px;
+  padding: 2px 10px;
+}
+
+.experiment-table__failure {
+  font-size: 12px;
+  color: #b45309;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
+  vertical-align: bottom;
+}
+
+.experiment-table__empty {
+  font-size: 14px;
+  color: #888;
+}

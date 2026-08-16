@@ -13,13 +13,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.toto.baseballApi.baseballresult.domain.BaseballResult;
 import com.toto.baseballApi.baseballresult.domain.BaseballResultRepository;
+import com.toto.baseballApi.pick.domain.AlgorithmParams;
 import com.toto.baseballApi.pick.domain.PickAlgorithm;
-import com.toto.baseballApi.pick.domain.PickDetail;
+import com.toto.baseballApi.pick.domain.PickBacktester;
 import com.toto.baseballApi.pick.domain.PickMaster;
 import com.toto.baseballApi.pick.domain.PickMasterRepository;
-import com.toto.baseballApi.pick.domain.PickSettlement;
-import com.toto.baseballApi.pick.domain.PickSlip;
+import com.toto.baseballApi.pick.domain.PickUniverse;
+import com.toto.baseballApi.pick.domain.SettledSlip;
 import com.toto.baseballApi.pick.domain.SlipSelectionInput;
+import com.toto.baseballApi.pick.domain.TeamFormIndex;
 
 /**
  * Backtests every requested {@link PickAlgorithm} over the same ymd range (apples-to-apples):
@@ -31,9 +33,6 @@ import com.toto.baseballApi.pick.domain.SlipSelectionInput;
 public class PickSimulationService {
 
     static final String SIMULATION_USER_NAME = "NSC";
-    private static final List<String> TOURNAMENTS = List.of("KBO", "NPB", "MLB");
-    private static final String THREE_WAY_GAME_TYPE = "야구 승1패";
-    private static final String TWO_WAY_GAME_TYPE = "야구 승패";
 
     private final PickMasterRepository pickMasterRepository;
     private final BaseballResultRepository baseballResultRepository;
@@ -77,9 +76,10 @@ public class PickSimulationService {
                 command.bgngYmd(), command.endYmd());
 
         List<BaseballResult> targetGames = baseballResultRepository.findByGameTypeAndTournamentsAndYmdBetween(
-                THREE_WAY_GAME_TYPE, TOURNAMENTS, command.bgngYmd(), command.endYmd());
+                PickUniverse.THREE_WAY_GAME_TYPE, PickUniverse.TOURNAMENTS,
+                command.bgngYmd(), command.endYmd());
         List<BaseballResult> historyGames = baseballResultRepository.findByGameTypeAndTournamentsAndYmdBefore(
-                TWO_WAY_GAME_TYPE, TOURNAMENTS, command.endYmd());
+                PickUniverse.TWO_WAY_GAME_TYPE, PickUniverse.TOURNAMENTS, command.endYmd());
 
         Map<DayKey, List<BaseballResult>> gamesByDay = targetGames.stream()
                 .collect(Collectors.groupingBy(g -> new DayKey(g.year(), g.round(), g.ymd())));
@@ -89,8 +89,12 @@ public class PickSimulationService {
                         .thenComparing(DayKey::round))
                 .toList();
 
+        // Built once for the whole run — per-day rebuilds would re-sort the full history every day.
+        TeamFormIndex formIndex = TeamFormIndex.build(historyGames);
+
         List<SimulationResult.AlgorithmRun> runs = algorithms.stream()
-                .map(algorithm -> runAlgorithm(algorithm, dayKeys, gamesByDay, historyGames, command))
+                .map(algorithm -> runAlgorithm(
+                        algorithm, dayKeys, gamesByDay, historyGames, formIndex, command))
                 .toList();
         return new SimulationResult(runs);
     }
@@ -113,7 +117,7 @@ public class PickSimulationService {
     private SimulationResult.AlgorithmRun runAlgorithm(
             PickAlgorithm algorithm, List<DayKey> dayKeys,
             Map<DayKey, List<BaseballResult>> gamesByDay, List<BaseballResult> historyGames,
-            SimulatePicksCommand command) {
+            TeamFormIndex formIndex, SimulatePicksCommand command) {
         int dayCount = 0;
         int slipCount = 0;
         int hitCount = 0;
@@ -121,7 +125,8 @@ public class PickSimulationService {
         BigDecimal outputTotal = BigDecimal.ZERO;
 
         for (DayKey day : dayKeys) {
-            DayTotals totals = simulateDay(algorithm, day, gamesByDay.get(day), historyGames, command);
+            DayTotals totals = simulateDay(
+                    algorithm, day, gamesByDay.get(day), historyGames, formIndex, command);
             dayCount++;
             slipCount += totals.slipCount();
             hitCount += totals.hitCount();
@@ -138,35 +143,33 @@ public class PickSimulationService {
 
     private DayTotals simulateDay(
             PickAlgorithm algorithm, DayKey day, List<BaseballResult> dayGames,
-            List<BaseballResult> historyGames, SimulatePicksCommand command) {
+            List<BaseballResult> historyGames, TeamFormIndex formIndex, SimulatePicksCommand command) {
         // Rolling window: only games strictly before this day feed the win-rate ranking.
         List<BaseballResult> priorGames = historyGames.stream()
                 .filter(g -> g.ymd().compareTo(day.ymd()) < 0)
                 .toList();
 
-        List<PickSlip> slips = algorithm.selectSlips(new SlipSelectionInput(
-                day.ymd(), command.num(), command.x(), command.y(), command.combinedN(),
-                dayGames, priorGames));
-
         Map<Integer, BaseballResult> dayGamesById = dayGames.stream()
                 .collect(Collectors.toMap(BaseballResult::id, Function.identity()));
 
+        SlipSelectionInput input = new SlipSelectionInput(
+                day.ymd(), command.num(), command.x(), command.y(), command.combinedN(),
+                dayGames, priorGames, formIndex, AlgorithmParams.empty());
+        List<SettledSlip> slips = PickBacktester.runDay(
+                algorithm, input, dayGamesById, command.inputMoney());
+
         int hits = 0;
         BigDecimal outputSum = BigDecimal.ZERO;
-        for (PickSlip slip : slips) {
-            List<PickDetail> details = slip.selections().stream()
-                    .map(s -> new PickDetail(null, s.resultId(), s.predictedTotalResult()))
-                    .toList();
-            BigDecimal outputMoney = PickSettlement.settle(details, dayGamesById, command.inputMoney());
-
+        for (SettledSlip slip : slips) {
             pickMasterRepository.save(new PickMaster(
                     null, day.year(), day.round(), day.ymd(),
-                    SIMULATION_USER_NAME, algorithm.code(), command.inputMoney(), outputMoney, details));
+                    SIMULATION_USER_NAME, algorithm.code(), command.inputMoney(), slip.outputMoney(),
+                    slip.details()));
 
-            if (outputMoney.compareTo(BigDecimal.ZERO) > 0) {
+            if (slip.hit()) {
                 hits++;
             }
-            outputSum = outputSum.add(outputMoney);
+            outputSum = outputSum.add(slip.outputMoney());
         }
 
         BigDecimal inputSum = command.inputMoney().multiply(BigDecimal.valueOf(slips.size()));

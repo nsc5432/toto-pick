@@ -10,3 +10,21 @@ spring:
     hibernate:
       ddl-auto: none
     open-in-view: false
+
+# 최적 알고리즘 탐색 파이프라인 설정.
+# goal 은 "목표치 달성 여부"의 기준선 — 탐색을 돌리기 전에 미리 선언해 두는 값이며,
+# 결과가 실망스럽다고 사후에 낮추면 판정 자체가 무의미해집니다.
+research:
+  goal:
+    target-profit-rate: 0.10   # 검증 구간 수익률 (output-input)/input
+    min-slip-count: 100        # 이 미만이면 운으로 나온 수치 — 순위에서 실격 처리
+    min-betting-day-count: 20
+    # min-hit-rate: 0.20       # 선택 — 지정 시에만 판정
+    # max-drawdown: 500000     # 선택 — 누적 손익 최대 낙폭(원) 한도
+  search:
+    train-ratio: 0.7                  # 앞 70% 일자로 파라미터 선택, 뒤 30%로 검증
+    max-candidates-per-algorithm: 200 # 격자가 이보다 크면 시드 고정 랜덤 샘플링
+    validation-top-k: 5               # 학습 상위 5개만 검증 구간에서 재측정
+    seed: 42                          # 고정 — 기록된 탐색을 그대로 재현하기 위해
+  ledger:
+    path: research/experiments.jsonl  # 실험 원장 (append-only)

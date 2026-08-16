@@ -43,19 +43,45 @@ DDL lives in `baseballApi/src/main/resources/db/ddl/`:
 
 ## Pick algorithms — how to add one
 
-Algorithms implement the domain port `pick/domain/PickAlgorithm` (`code()`, `name()`, `selectSlips(SlipSelectionInput)`). `code()` is the stable identity persisted to `pick_mstr.algorithm_code` — never rename a code that has persisted rows.
+Algorithms implement the domain port `pick/domain/PickAlgorithm` (`code()`, `name()`, `selectSlips(SlipSelectionInput)`). `code()` is the stable identity persisted to `pick_mstr.algorithm_code` and to the experiment ledger — never rename a code that has persisted rows.
 
-- **Pure-logic algorithm** (only needs `SlipSelectionInput`): put the class in `pick/domain/` (framework-free) and register it with a `@Bean` method in `pick/infrastructure/algorithm/PickAlgorithmConfig`. Examples: `WinRateOddsSlipSelector` (`WIN_RATE_ODDS`), `FavoriteOddsSlipAlgorithm` (`FAVORITE`).
+- **Pure-logic algorithm** (only needs `SlipSelectionInput`): put the class in `pick/domain/` (framework-free) and register it with a `@Bean` method in `pick/infrastructure/algorithm/PickAlgorithmConfig`. Examples: `WinRateOddsSlipSelector` (`WIN_RATE_ODDS`), `FavoriteOddsSlipAlgorithm` (`FAVORITE`), `MarketEdgeSlipAlgorithm` (`MARKET_EDGE`).
 - **Data-dependent algorithm** (needs repositories/services): put it in `pick/infrastructure/algorithm/` as a `@Component` implementing the domain port.
 
 One bean with a unique `code()` is all it takes — the algorithm then automatically appears in `GET /api/picks/algorithms`, runs in `POST /api/picks/simulate`, and shows up in the frontend comparison dashboard. Duplicate codes fail fast at startup. Simulation KPIs are aggregated from persisted `pick_mstr` rows by `PickKpiService` (`GET /api/picks/kpis?bgngYmd=&endYmd=&groupBy=day|round&algorithmCodes=`).
+
+Two rules that matter for anything new:
+
+- **Implement `TunableAlgorithm`, not bare `PickAlgorithm`.** Any threshold in the algorithm should be declared in `paramSpace()` as a `ParamSpec`. A constant baked into the code is never swept, so it is never validated. Declaring one of the four standard names (`num`, `x`, `y`, `combinedN`) feeds the swept value into the matching `SlipSelectionInput` component; any other name arrives via `input.params().get("name", fallback)` (see `MarketEdgeSlipAlgorithm`'s `edgeThreshold`).
+- **Read team form from `input.formIndex()`, never by walking `historyGames` yourself.** `TeamFormIndex.winPercent(team, input.ymd(), num)` only ever sees games before that date, which makes lookahead structurally impossible rather than a rule each caller has to remember. It is also built once per run instead of per day — a sweep of hundreds of candidates is only feasible because of this.
+
+## Optimal-algorithm search pipeline (`research` feature)
+
+The `research` feature turns "try an algorithm" into a repeatable loop: **분류/정의 → 구현 → 결과확인 → 목표치 판정**. It depends on `pick` (never the reverse) and writes nothing to the database.
+
+- **Parameter space** — `pick/domain/{ParamSpec, ParamSpace, AlgorithmParams, TunableAlgorithm}`. `ParamSpace.candidates(budget, seed)` enumerates the exhaustive grid while it fits the budget and falls back to a seeded random sample beyond it.
+- **Backtest** — `research/application/BacktestService` loads the range once (`BacktestData`: games grouped by day, history sorted, form index, history prefix lengths) and scores each candidate in memory. It settles through the same `pick/domain/PickBacktester` the real simulation uses, so search numbers and simulation numbers cannot diverge.
+- **Train/validation split** — `BacktestSplit.byRatio` cuts the days chronologically (earlier days train, later days validate). `AlgorithmSearchService` selects parameters **only** on train, then re-scores just the top K on validation. Scoring every candidate on validation would leak the held-out window into selection.
+- **Ranking** — `ObjectiveScore`: validation profit rate, behind a minimum-slip gate. Under-sampled candidates are kept and shown but sort below every qualified one, so a lucky 4-bet run can never win a search.
+- **Goal** — `ExperimentGoal`, declared in `application.yaml` under `research.goal` before any search runs and deliberately **not** overridable per request. Evaluated against validation metrics only.
+- **Ledger** — `research/experiments.jsonl` (append-only JSONL, `research/infrastructure/persistence/JsonlExperimentLedger`). Each entry carries params, both windows, both windows' metrics, the verdict, and the seed, so a run is re-runnable. `pick_mstr` cannot serve this: it is keyed on `algorithm_code` alone, so re-running at a different `x` overwrites the previous result.
+
+Endpoints (`/api/research`): `GET /goal`, `GET /algorithms`, `POST /search`, `POST /backtest`, `GET /leaderboard?limit=`, `GET /experiments`. Frontend: `/research` (`pages/research`).
+
+Committing a winner to `pick_mstr` stays a separate, deliberate `POST /api/picks/simulate` call — searching is exploration and must not litter the operational tables.
+
+**`YMD` is 6-digit `YYMMDD`** (e.g. `260421`), despite the `VARCHAR(8)` column.
+
+### Driving the loop with Claude
+
+`.claude/skills/algo-search/` encodes one iteration of the loop: state check (ledger + API + goal), hypothesis classification against `references/taxonomy.md`, implementation, sweep, and verdict — plus the stop conditions and the anti-patterns (choosing parameters on validation numbers, reseeding until a run looks good, reporting train metrics as results). The taxonomy classifies signal families (market-following, form×odds, value/edge, schedule, odds-structure, combination) so a new hypothesis is a genuinely new family rather than a rename of an existing one.
 
 ## Statistical analysis via MCP
 
 `.mcp.json` registers the `kbo-mysql` MCP server (`@benborla29/mcp-server-mysql`) so Claude can query the `kbo` schema directly — e.g. analyze `baseball_result` win rates/odds distributions to design and sanity-check new pick algorithms before implementing them.
 
 - Requires the `KBO_DB_PASSWORD` environment variable (set once with `setx KBO_DB_PASSWORD "<password>"`; the password is not committed).
-- The server is query-only: `ALLOW_INSERT/UPDATE/DELETE_OPERATION` are all `false`. Verify findings with read-only SQL, then codify the strategy as a `PickAlgorithm` implementation and backtest it via the simulation.
+- The server is query-only: `ALLOW_INSERT/UPDATE/DELETE_OPERATION` are all `false`. Verify findings with read-only SQL, then codify the strategy as a `TunableAlgorithm` implementation and put it through the search pipeline. Checking for a signal in SQL first is much cheaper than implementing and sweeping one that isn't there.
 
 ## Backend architecture (baseballApi)
 

@@ -2,7 +2,6 @@ package com.toto.baseballApi.pick.domain;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -24,8 +23,12 @@ import com.toto.baseballApi.baseballresult.domain.BaseballResult;
  * <p>Candidates are grouped (MLB alone; KBO+NPB together), sorted by the predicted side's odds
  * ascending, and chunked into slips of exactly {@code combinedN}; the trailing incomplete chunk —
  * the highest-odds leftovers — is discarded.
+ *
+ * <p>All four knobs are tunable: the window length and both odds thresholds decide how selective
+ * the filter is, and {@code combinedN} trades hit rate against payout. Which combination actually
+ * earns is an empirical question, which is what the search pipeline is for.
  */
-public class WinRateOddsSlipSelector implements PickAlgorithm {
+public class WinRateOddsSlipSelector implements TunableAlgorithm {
 
     public static final String CODE = "WIN_RATE_ODDS";
 
@@ -45,8 +48,21 @@ public class WinRateOddsSlipSelector implements PickAlgorithm {
     }
 
     @Override
+    public ParamSpace paramSpace() {
+        return ParamSpace.of(
+                // Window length: short enough to track form, long enough not to be one hot streak.
+                new ParamSpec(AlgorithmParams.NUM, 5, 40, 5, 20),
+                // Back a strong team only while the market still pays at least x for it.
+                new ParamSpec(AlgorithmParams.X, 1.4, 3.0, 0.1, 1.8),
+                // Fade a weak team only while the market prices it at or under y.
+                new ParamSpec(AlgorithmParams.Y, 1.4, 3.0, 0.1, 2.5),
+                // Legs per slip: more legs multiply the payout and shrink the hit rate.
+                new ParamSpec(AlgorithmParams.COMBINED_N, 2, 5, 1, 3));
+    }
+
+    @Override
     public List<PickSlip> selectSlips(SlipSelectionInput input) {
-        TeamRankSets rankSets = rankTeams(input.historyGames(), input.num());
+        TeamRankSets rankSets = rankTeams(input.formIndex(), input.ymd(), input.num());
 
         List<Candidate> mlbCandidates = new ArrayList<>();
         List<Candidate> kboNpbCandidates = new ArrayList<>();
@@ -64,33 +80,14 @@ public class WinRateOddsSlipSelector implements PickAlgorithm {
         return slips;
     }
 
-    private record Appearance(String ymd, String tm, boolean win) {
-    }
-
     private record TeamRankSets(Set<String> top, Set<String> bottom) {
     }
 
     private record Candidate(Integer resultId, String predictedTotalResult, double odds) {
     }
 
-    private TeamRankSets rankTeams(List<BaseballResult> historyGames, int num) {
-        Map<String, List<Appearance>> appearancesByTeam = new HashMap<>();
-        for (BaseballResult game : historyGames) {
-            appearancesByTeam.computeIfAbsent(game.home(), k -> new ArrayList<>())
-                    .add(new Appearance(game.ymd(), game.tm(), HOME_WIN.equals(game.totalResult())));
-            appearancesByTeam.computeIfAbsent(game.away(), k -> new ArrayList<>())
-                    .add(new Appearance(game.ymd(), game.tm(), AWAY_WIN.equals(game.totalResult())));
-        }
-
-        Map<String, Long> percentByTeam = new HashMap<>();
-        Comparator<Appearance> mostRecentFirst = Comparator.comparing(Appearance::ymd)
-                .thenComparing(Appearance::tm)
-                .reversed();
-        appearancesByTeam.forEach((team, appearances) -> {
-            List<Appearance> recent = appearances.stream().sorted(mostRecentFirst).limit(num).toList();
-            long wins = recent.stream().filter(Appearance::win).count();
-            percentByTeam.put(team, Math.round(wins * 100.0 / recent.size()));
-        });
+    private TeamRankSets rankTeams(TeamFormIndex formIndex, String ymd, int num) {
+        Map<String, Long> percentByTeam = formIndex.winPercents(ymd, num);
 
         List<Long> distinctDesc = percentByTeam.values().stream().distinct()
                 .sorted(Comparator.reverseOrder())

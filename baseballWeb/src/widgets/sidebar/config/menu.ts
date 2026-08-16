@@ -5,6 +5,6 @@ export interface MenuItem {
 
 export const menuItems: MenuItem[] = [
   { label: "경기결과 조회", path: "/baseball-results" },
-  { label: "시뮬레이션 결과 조회", path: "/pick-results" },
+  { label: "알고리즘 비교 대시보드", path: "/pick-results" },
   { label: "관리자", path: "/admin" },
 ];

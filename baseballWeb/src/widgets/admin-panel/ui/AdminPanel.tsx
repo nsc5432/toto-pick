@@ -2,12 +2,9 @@ import { useState, useTransition } from "react";
 
 import { backfillBaseballResultDivs } from "@/entities/baseball-result";
 import type { DivBackfillResult } from "@/entities/baseball-result";
+import { isAbortError } from "@/shared/lib";
 
 import "./AdminPanel.css";
-
-function isAbortError(err: unknown): boolean {
-  return err instanceof DOMException && err.name === "AbortError";
-}
 
 export function AdminPanel() {
   const [result, setResult] = useState<DivBackfillResult | null>(null);

@@ -3,22 +3,11 @@ import { useEffect, useState, useTransition } from "react";
 import { fetchPickResults } from "@/entities/pick-result";
 import type { PickResult } from "@/entities/pick-result";
 import type { PageResponse } from "@/shared/api";
+import { formatMoney, formatRate, isAbortError } from "@/shared/lib";
 
 import "./PickResultGrid.css";
 
 const PAGE_SIZE = 20;
-
-function isAbortError(err: unknown): boolean {
-  return err instanceof DOMException && err.name === "AbortError";
-}
-
-function formatMoney(value: number | null): string {
-  return value === null ? "미정산" : value.toLocaleString();
-}
-
-function formatProfitRate(value: number | null): string {
-  return value === null ? "-" : `${(value * 100).toFixed(1)}%`;
-}
 
 export function PickResultGrid() {
   const [page, setPage] = useState(0);
@@ -58,6 +47,7 @@ export function PickResultGrid() {
               <th>회차</th>
               <th>날짜</th>
               <th>사용자</th>
+              <th>알고리즘</th>
               <th>투입금액</th>
               <th>적중금액</th>
               <th>수익률</th>
@@ -70,14 +60,15 @@ export function PickResultGrid() {
                 <td>{row.round}</td>
                 <td>{row.ymd ?? "-"}</td>
                 <td>{row.userName}</td>
+                <td>{row.algorithmCode ?? "-"}</td>
                 <td>{row.inputMoney.toLocaleString()}</td>
                 <td>{formatMoney(row.outputMoney)}</td>
-                <td>{formatProfitRate(row.profitRate)}</td>
+                <td>{formatRate(row.profitRate)}</td>
               </tr>
             ))}
             {!loading && data?.content.length === 0 && (
               <tr>
-                <td colSpan={7} className="pick-result-grid__empty">
+                <td colSpan={8} className="pick-result-grid__empty">
                   데이터가 없습니다.
                 </td>
               </tr>

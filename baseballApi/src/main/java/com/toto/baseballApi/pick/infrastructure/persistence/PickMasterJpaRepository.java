@@ -8,5 +8,9 @@ interface PickMasterJpaRepository extends JpaRepository<PickMasterJpaEntity, Int
 
     List<PickMasterJpaEntity> findByOutputMoneyIsNull();
 
-    List<PickMasterJpaEntity> findByUserNameAndYmdBetween(String userName, String ymdFrom, String ymdTo);
+    List<PickMasterJpaEntity> findByUserNameAndAlgorithmCodeInAndYmdBetween(
+            String userName, List<String> algorithmCodes, String ymdFrom, String ymdTo);
+
+    List<PickMasterJpaEntity> findByUserNameAndAlgorithmCodeIsNotNullAndYmdBetween(
+            String userName, String ymdFrom, String ymdTo);
 }

@@ -11,11 +11,9 @@ import org.springframework.stereotype.Service;
 
 import com.toto.baseballApi.baseballresult.domain.BaseballResult;
 import com.toto.baseballApi.baseballresult.domain.BaseballResultRepository;
-import com.toto.baseballApi.pick.domain.PickAlgorithm;
 import com.toto.baseballApi.pick.domain.PickDetail;
 import com.toto.baseballApi.pick.domain.PickMaster;
 import com.toto.baseballApi.pick.domain.PickMasterRepository;
-import com.toto.baseballApi.pick.domain.PickSelection;
 import com.toto.baseballApi.pick.domain.PickSettlement;
 
 import lombok.RequiredArgsConstructor;
@@ -27,33 +25,12 @@ public class PickService {
     private final PickMasterRepository pickMasterRepository;
     private final BaseballResultRepository baseballResultRepository;
 
-    /**
-     * Spring collects every {@link PickAlgorithm} bean into this map, keyed by bean name.
-     * Adding a new algorithm implementation (a new {@code @Component("name")}) makes it
-     * selectable here with no change to this service — the DIP swap point.
-     */
-    private final Map<String, PickAlgorithm> algorithms;
-
     public PickMaster createPick(CreatePickCommand command) {
-        boolean hasAlgorithm = command.algorithmName() != null;
-        boolean hasManualPicks = command.manualPicks() != null && !command.manualPicks().isEmpty();
-        if (hasAlgorithm == hasManualPicks) {
-            throw new IllegalArgumentException(
-                    "Exactly one of algorithmName or manualPicks must be provided");
+        if (command.manualPicks() == null || command.manualPicks().isEmpty()) {
+            throw new IllegalArgumentException("manualPicks must be provided");
         }
 
-        List<PickSelection> selections;
-        if (hasAlgorithm) {
-            PickAlgorithm algorithm = algorithms.get(command.algorithmName());
-            if (algorithm == null) {
-                throw new IllegalArgumentException("Unknown algorithmName: " + command.algorithmName());
-            }
-            selections = algorithm.selectPicks(command.year(), command.round(), command.inputMoney());
-        } else {
-            selections = command.manualPicks();
-        }
-
-        List<PickDetail> details = selections.stream()
+        List<PickDetail> details = command.manualPicks().stream()
                 .map(selection -> new PickDetail(null, selection.resultId(), selection.predictedTotalResult()))
                 .toList();
 
@@ -63,6 +40,7 @@ public class PickService {
                 command.round(),
                 null,
                 command.userName(),
+                null,
                 command.inputMoney(),
                 null,
                 details);
@@ -90,6 +68,7 @@ public class PickService {
                 pickMaster.round(),
                 pickMaster.ymd(),
                 pickMaster.userName(),
+                pickMaster.algorithmCode(),
                 pickMaster.inputMoney(),
                 outputMoney,
                 pickMaster.details());

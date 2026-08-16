@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.toto.baseballApi.pick.domain.PickDetail;
+import com.toto.baseballApi.pick.domain.PickKpiRow;
 import com.toto.baseballApi.pick.domain.PickMaster;
 import com.toto.baseballApi.pick.domain.PickMasterRepository;
 
@@ -62,9 +63,10 @@ class PickMasterRepositoryImpl implements PickMasterRepository {
 
     @Override
     @Transactional
-    public int deleteByUserNameAndYmdRange(String userName, String ymdFrom, String ymdTo) {
-        List<PickMasterJpaEntity> masters =
-                pickMasterJpaRepository.findByUserNameAndYmdBetween(userName, ymdFrom, ymdTo);
+    public int deleteByUserNameAndAlgorithmCodesAndYmdRange(
+            String userName, List<String> algorithmCodes, String ymdFrom, String ymdTo) {
+        List<PickMasterJpaEntity> masters = pickMasterJpaRepository
+                .findByUserNameAndAlgorithmCodeInAndYmdBetween(userName, algorithmCodes, ymdFrom, ymdTo);
         if (masters.isEmpty()) {
             return 0;
         }
@@ -77,6 +79,21 @@ class PickMasterRepositoryImpl implements PickMasterRepository {
         return masters.size();
     }
 
+    @Override
+    public List<PickKpiRow> findKpiRows(
+            String userName, List<String> algorithmCodes, String ymdFrom, String ymdTo) {
+        List<PickMasterJpaEntity> masters = (algorithmCodes == null || algorithmCodes.isEmpty())
+                ? pickMasterJpaRepository.findByUserNameAndAlgorithmCodeIsNotNullAndYmdBetween(
+                        userName, ymdFrom, ymdTo)
+                : pickMasterJpaRepository.findByUserNameAndAlgorithmCodeInAndYmdBetween(
+                        userName, algorithmCodes, ymdFrom, ymdTo);
+        return masters.stream()
+                .map(m -> new PickKpiRow(
+                        m.getAlgorithmCode(), m.getYmd(), m.getYear(), m.getRound(),
+                        m.getInputMoney(), m.getOutputMoney()))
+                .toList();
+    }
+
     private PickMasterJpaEntity toMasterEntity(PickMaster pickMaster) {
         return new PickMasterJpaEntity(
                 pickMaster.id(),
@@ -84,6 +101,7 @@ class PickMasterRepositoryImpl implements PickMasterRepository {
                 pickMaster.round(),
                 pickMaster.ymd(),
                 pickMaster.userName(),
+                pickMaster.algorithmCode(),
                 pickMaster.inputMoney(),
                 pickMaster.outputMoney());
     }
@@ -99,6 +117,7 @@ class PickMasterRepositoryImpl implements PickMasterRepository {
                 master.getRound(),
                 master.getYmd(),
                 master.getUserName(),
+                master.getAlgorithmCode(),
                 master.getInputMoney(),
                 master.getOutputMoney(),
                 details.stream().map(this::toDomainDetail).toList());

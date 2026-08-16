@@ -1,6 +1,7 @@
 package com.toto.baseballApi.pick.presentation;
 
 import java.util.List;
+import java.util.Locale;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -12,15 +13,20 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.toto.baseballApi.pick.application.CreatePickCommand;
+import com.toto.baseballApi.pick.application.PickKpiQuery;
+import com.toto.baseballApi.pick.application.PickKpiService;
 import com.toto.baseballApi.pick.application.PickService;
 import com.toto.baseballApi.pick.application.PickSimulationService;
 import com.toto.baseballApi.pick.application.SimulatePicksCommand;
 import com.toto.baseballApi.pick.domain.PickSelection;
+import com.toto.baseballApi.pick.presentation.dto.AlgorithmResponse;
 import com.toto.baseballApi.pick.presentation.dto.CreatePickRequest;
+import com.toto.baseballApi.pick.presentation.dto.PickKpiResponse;
 import com.toto.baseballApi.pick.presentation.dto.PickResponse;
 import com.toto.baseballApi.pick.presentation.dto.SimulatePicksRequest;
 import com.toto.baseballApi.pick.presentation.dto.SimulationResponse;
@@ -35,25 +41,30 @@ public class PickController {
 
     private final PickService pickService;
     private final PickSimulationService pickSimulationService;
+    private final PickKpiService pickKpiService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public PickResponse createPick(@Valid @RequestBody CreatePickRequest request) {
-        List<PickSelection> manualPicks = request.manualPicks() == null
-                ? null
-                : request.manualPicks().stream()
-                        .map(p -> new PickSelection(p.resultId(), p.totalResult()))
-                        .toList();
+        List<PickSelection> manualPicks = request.manualPicks().stream()
+                .map(p -> new PickSelection(p.resultId(), p.totalResult()))
+                .toList();
 
         CreatePickCommand command = new CreatePickCommand(
                 request.year(),
                 request.round(),
                 request.userName(),
                 request.inputMoney(),
-                request.algorithmName(),
                 manualPicks);
 
         return PickResponse.from(pickService.createPick(command));
+    }
+
+    @GetMapping("/algorithms")
+    public List<AlgorithmResponse> algorithms() {
+        return pickSimulationService.availableAlgorithms().stream()
+                .map(AlgorithmResponse::from)
+                .toList();
     }
 
     @PostMapping("/simulate")
@@ -65,9 +76,24 @@ public class PickController {
                 request.x(),
                 request.y(),
                 request.inputMoney(),
-                request.combinedN());
+                request.combinedN(),
+                request.algorithmCodes());
 
         return SimulationResponse.from(pickSimulationService.simulate(command));
+    }
+
+    @GetMapping("/kpis")
+    public PickKpiResponse kpis(
+            @RequestParam String bgngYmd,
+            @RequestParam String endYmd,
+            @RequestParam(defaultValue = "day") String groupBy,
+            @RequestParam(required = false) List<String> algorithmCodes) {
+        PickKpiQuery query = new PickKpiQuery(
+                bgngYmd,
+                endYmd,
+                PickKpiQuery.GroupBy.valueOf(groupBy.toUpperCase(Locale.ROOT)),
+                algorithmCodes);
+        return PickKpiResponse.from(pickKpiService.kpis(query));
     }
 
     @PostMapping("/{id}/settle")

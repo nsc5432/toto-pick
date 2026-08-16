@@ -1,8 +1,8 @@
 package com.toto.baseballApi.pick.application;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -13,23 +13,21 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.toto.baseballApi.baseballresult.domain.BaseballResult;
 import com.toto.baseballApi.baseballresult.domain.BaseballResultRepository;
+import com.toto.baseballApi.pick.domain.PickAlgorithm;
 import com.toto.baseballApi.pick.domain.PickDetail;
 import com.toto.baseballApi.pick.domain.PickMaster;
 import com.toto.baseballApi.pick.domain.PickMasterRepository;
 import com.toto.baseballApi.pick.domain.PickSettlement;
 import com.toto.baseballApi.pick.domain.PickSlip;
 import com.toto.baseballApi.pick.domain.SlipSelectionInput;
-import com.toto.baseballApi.pick.domain.WinRateOddsSlipSelector;
-
-import lombok.RequiredArgsConstructor;
 
 /**
- * Backtests the {@link WinRateOddsSlipSelector} strategy over a ymd range: regenerates the
- * simulation user's picks day by day (rolling win-rate window), settles them against the
- * historical results, and reports per-day KPIs.
+ * Backtests every requested {@link PickAlgorithm} over the same ymd range (apples-to-apples):
+ * regenerates the simulation user's picks per algorithm day by day (rolling win-rate window),
+ * settles them against the historical results, and reports per-algorithm run totals. Per-period
+ * KPIs are then served from the persisted picks by {@link PickKpiService}.
  */
 @Service
-@RequiredArgsConstructor
 public class PickSimulationService {
 
     static final String SIMULATION_USER_NAME = "NSC";
@@ -39,7 +37,28 @@ public class PickSimulationService {
 
     private final PickMasterRepository pickMasterRepository;
     private final BaseballResultRepository baseballResultRepository;
-    private final WinRateOddsSlipSelector selector = new WinRateOddsSlipSelector();
+    private final Map<String, PickAlgorithm> algorithmsByCode;
+
+    PickSimulationService(
+            PickMasterRepository pickMasterRepository,
+            BaseballResultRepository baseballResultRepository,
+            List<PickAlgorithm> algorithms) {
+        this.pickMasterRepository = pickMasterRepository;
+        this.baseballResultRepository = baseballResultRepository;
+        this.algorithmsByCode = algorithms.stream().collect(Collectors.toMap(
+                PickAlgorithm::code,
+                Function.identity(),
+                (a, b) -> {
+                    throw new IllegalStateException("Duplicate PickAlgorithm code: " + a.code());
+                },
+                LinkedHashMap::new));
+    }
+
+    public List<AlgorithmInfo> availableAlgorithms() {
+        return algorithmsByCode.values().stream()
+                .map(a -> new AlgorithmInfo(a.code(), a.name()))
+                .toList();
+    }
 
     private record DayKey(Integer year, Integer round, String ymd) {
     }
@@ -49,10 +68,13 @@ public class PickSimulationService {
         if (command.bgngYmd().compareTo(command.endYmd()) > 0) {
             throw new IllegalArgumentException("bgngYmd must not be after endYmd");
         }
+        List<PickAlgorithm> algorithms = resolveAlgorithms(command.algorithmCodes());
 
         // Re-running the same range replaces the previous simulation instead of stacking onto it.
-        pickMasterRepository.deleteByUserNameAndYmdRange(
-                SIMULATION_USER_NAME, command.bgngYmd(), command.endYmd());
+        pickMasterRepository.deleteByUserNameAndAlgorithmCodesAndYmdRange(
+                SIMULATION_USER_NAME,
+                algorithms.stream().map(PickAlgorithm::code).toList(),
+                command.bgngYmd(), command.endYmd());
 
         List<BaseballResult> targetGames = baseballResultRepository.findByGameTypeAndTournamentsAndYmdBetween(
                 THREE_WAY_GAME_TYPE, TOURNAMENTS, command.bgngYmd(), command.endYmd());
@@ -67,34 +89,62 @@ public class PickSimulationService {
                         .thenComparing(DayKey::round))
                 .toList();
 
-        List<SimulationResult.DayResult> days = new ArrayList<>();
+        List<SimulationResult.AlgorithmRun> runs = algorithms.stream()
+                .map(algorithm -> runAlgorithm(algorithm, dayKeys, gamesByDay, historyGames, command))
+                .toList();
+        return new SimulationResult(runs);
+    }
+
+    private List<PickAlgorithm> resolveAlgorithms(List<String> codes) {
+        if (codes == null || codes.isEmpty()) {
+            return List.copyOf(algorithmsByCode.values());
+        }
+        return codes.stream()
+                .map(code -> {
+                    PickAlgorithm algorithm = algorithmsByCode.get(code);
+                    if (algorithm == null) {
+                        throw new IllegalArgumentException("Unknown algorithm code: " + code);
+                    }
+                    return algorithm;
+                })
+                .toList();
+    }
+
+    private SimulationResult.AlgorithmRun runAlgorithm(
+            PickAlgorithm algorithm, List<DayKey> dayKeys,
+            Map<DayKey, List<BaseballResult>> gamesByDay, List<BaseballResult> historyGames,
+            SimulatePicksCommand command) {
+        int dayCount = 0;
         int slipCount = 0;
         int hitCount = 0;
         BigDecimal inputTotal = BigDecimal.ZERO;
         BigDecimal outputTotal = BigDecimal.ZERO;
 
         for (DayKey day : dayKeys) {
-            SimulationResult.DayResult dayResult =
-                    simulateDay(day, gamesByDay.get(day), historyGames, command);
-            days.add(dayResult);
-            slipCount += dayResult.slipCount();
-            hitCount += dayResult.hitCount();
-            inputTotal = inputTotal.add(dayResult.inputTotal());
-            outputTotal = outputTotal.add(dayResult.outputTotal());
+            DayTotals totals = simulateDay(algorithm, day, gamesByDay.get(day), historyGames, command);
+            dayCount++;
+            slipCount += totals.slipCount();
+            hitCount += totals.hitCount();
+            inputTotal = inputTotal.add(totals.inputTotal());
+            outputTotal = outputTotal.add(totals.outputTotal());
         }
 
-        return new SimulationResult(days, days.size(), slipCount, hitCount, inputTotal, outputTotal);
+        return new SimulationResult.AlgorithmRun(
+                algorithm.code(), algorithm.name(), dayCount, slipCount, hitCount, inputTotal, outputTotal);
     }
 
-    private SimulationResult.DayResult simulateDay(
-            DayKey day, List<BaseballResult> dayGames, List<BaseballResult> historyGames,
-            SimulatePicksCommand command) {
+    private record DayTotals(int slipCount, int hitCount, BigDecimal inputTotal, BigDecimal outputTotal) {
+    }
+
+    private DayTotals simulateDay(
+            PickAlgorithm algorithm, DayKey day, List<BaseballResult> dayGames,
+            List<BaseballResult> historyGames, SimulatePicksCommand command) {
         // Rolling window: only games strictly before this day feed the win-rate ranking.
         List<BaseballResult> priorGames = historyGames.stream()
                 .filter(g -> g.ymd().compareTo(day.ymd()) < 0)
                 .toList();
 
-        List<PickSlip> slips = selector.selectSlips(new SlipSelectionInput(
+        List<PickSlip> slips = algorithm.selectSlips(new SlipSelectionInput(
                 day.ymd(), command.num(), command.x(), command.y(), command.combinedN(),
                 dayGames, priorGames));
 
@@ -111,7 +161,7 @@ public class PickSimulationService {
 
             pickMasterRepository.save(new PickMaster(
                     null, day.year(), day.round(), day.ymd(),
-                    SIMULATION_USER_NAME, command.inputMoney(), outputMoney, details));
+                    SIMULATION_USER_NAME, algorithm.code(), command.inputMoney(), outputMoney, details));
 
             if (outputMoney.compareTo(BigDecimal.ZERO) > 0) {
                 hits++;
@@ -120,7 +170,6 @@ public class PickSimulationService {
         }
 
         BigDecimal inputSum = command.inputMoney().multiply(BigDecimal.valueOf(slips.size()));
-        return new SimulationResult.DayResult(
-                day.ymd(), day.year(), day.round(), slips.size(), hits, inputSum, outputSum);
+        return new DayTotals(slips.size(), hits, inputSum, outputSum);
     }
 }

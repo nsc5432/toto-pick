@@ -1,0 +1,180 @@
+.algorithm-kpi {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 24px 0;
+  font-family: system-ui, sans-serif;
+  text-align: left;
+}
+
+.algorithm-kpi h2 {
+  font-size: 18px;
+  margin: 24px 0 8px;
+}
+
+.algorithm-kpi__range {
+  font-size: 14px;
+  color: #555;
+  margin: 0 0 16px;
+}
+
+.algorithm-kpi__error {
+  color: #c0392b;
+}
+
+.algorithm-kpi__empty {
+  font-size: 14px;
+  color: #888;
+}
+
+/* 알고리즘별 KPI 카드 */
+.algorithm-kpi__cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.algorithm-kpi__card {
+  flex: 1 1 240px;
+  max-width: 340px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 14px 18px;
+  background: #fff;
+}
+
+.algorithm-kpi__card--best {
+  border: 2px solid #2563eb;
+  background: #eff6ff;
+}
+
+.algorithm-kpi__card-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.algorithm-kpi__card-name {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.algorithm-kpi__card-code {
+  font-size: 12px;
+  color: #888;
+}
+
+.algorithm-kpi__badges {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0 10px;
+  min-height: 20px;
+}
+
+.algorithm-kpi__badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: #2563eb;
+  border-radius: 10px;
+  padding: 2px 10px;
+}
+
+.algorithm-kpi__badge--hit {
+  background: #16a34a;
+}
+
+.algorithm-kpi__stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 16px;
+  margin: 0;
+}
+
+.algorithm-kpi__stats dt {
+  font-size: 12px;
+  color: #888;
+}
+
+.algorithm-kpi__stats dd {
+  margin: 2px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.algorithm-kpi__stat-main {
+  font-size: 20px !important;
+  color: #2563eb;
+}
+
+/* 비교/기간 테이블 */
+.algorithm-kpi__table-wrap {
+  overflow-x: auto;
+}
+
+.algorithm-kpi__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.algorithm-kpi__table th,
+.algorithm-kpi__table td {
+  border: 1px solid #ddd;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+
+.algorithm-kpi__table th {
+  background: #f5f5f5;
+  text-align: center;
+}
+
+.algorithm-kpi__table td {
+  text-align: right;
+}
+
+.algorithm-kpi__table td:first-child {
+  text-align: center;
+}
+
+.algorithm-kpi__name-cell {
+  text-align: left !important;
+}
+
+.algorithm-kpi__sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.algorithm-kpi__sortable--active {
+  color: #2563eb;
+}
+
+.algorithm-kpi__sub-header {
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.algorithm-kpi__row--best td {
+  background: #eff6ff;
+  font-weight: 600;
+}
+
+.algorithm-kpi__cell--best {
+  background: #eff6ff;
+  font-weight: 700;
+}
+
+.algorithm-kpi__cell--positive {
+  color: #16a34a;
+}
+
+.algorithm-kpi__cell--negative {
+  color: #dc2626;
+}
+
+.algorithm-kpi__empty-cell {
+  text-align: center !important;
+  padding: 24px;
+  color: #888;
+}

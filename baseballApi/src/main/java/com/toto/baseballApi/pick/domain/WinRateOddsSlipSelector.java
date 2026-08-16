@@ -25,13 +25,26 @@ import com.toto.baseballApi.baseballresult.domain.BaseballResult;
  * ascending, and chunked into slips of exactly {@code combinedN}; the trailing incomplete chunk —
  * the highest-odds leftovers — is discarded.
  */
-public class WinRateOddsSlipSelector {
+public class WinRateOddsSlipSelector implements PickAlgorithm {
+
+    public static final String CODE = "WIN_RATE_ODDS";
 
     private static final String MLB = "MLB";
     private static final String HOME_WIN = "승";
     private static final String AWAY_WIN = "패";
     private static final int RANK_LIMIT = 5;
 
+    @Override
+    public String code() {
+        return CODE;
+    }
+
+    @Override
+    public String name() {
+        return "승률-배당 괴리";
+    }
+
+    @Override
     public List<PickSlip> selectSlips(SlipSelectionInput input) {
         TeamRankSets rankSets = rankTeams(input.historyGames(), input.num());
 

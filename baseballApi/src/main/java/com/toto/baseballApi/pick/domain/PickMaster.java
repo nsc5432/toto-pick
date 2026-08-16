@@ -9,6 +9,7 @@ public record PickMaster(
         Integer round,
         String ymd,
         String userName,
+        String algorithmCode,
         BigDecimal inputMoney,
         BigDecimal outputMoney,
         List<PickDetail> details) {

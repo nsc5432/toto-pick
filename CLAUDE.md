@@ -31,7 +31,31 @@ No test runner is configured in `baseballWeb` yet.
 
 ## Database
 
-MySQL, schema **`kbo`** (not `toto`, despite the DB name suggested by the folder/project naming), table `baseball_result`. Connection is configured in `baseballApi/src/main/resources/application.yaml`.
+MySQL, schema **`kbo`** (not `toto`, despite the DB name suggested by the folder/project naming). Connection is configured in `baseballApi/src/main/resources/application.yaml`.
+
+Four tables: `baseball_result` (finished games + odds), `match_schedule` (pre-game staging, populated externally, no Java code), `pick_mstr` (one betting slip; simulation slips carry `algorithm_code`), `pick_dtl` (slip legs).
+
+DDL lives in `baseballApi/src/main/resources/db/ddl/`:
+- `schema.sql` — full CREATEs for all 4 tables (fresh database)
+- `alter_add_algorithm_code.sql` — migration for databases that predate `pick_mstr.algorithm_code`
+
+`spring.jpa.hibernate.ddl-auto` is `none` and there is no Flyway/Liquibase — apply DDL by hand with the mysql CLI.
+
+## Pick algorithms — how to add one
+
+Algorithms implement the domain port `pick/domain/PickAlgorithm` (`code()`, `name()`, `selectSlips(SlipSelectionInput)`). `code()` is the stable identity persisted to `pick_mstr.algorithm_code` — never rename a code that has persisted rows.
+
+- **Pure-logic algorithm** (only needs `SlipSelectionInput`): put the class in `pick/domain/` (framework-free) and register it with a `@Bean` method in `pick/infrastructure/algorithm/PickAlgorithmConfig`. Examples: `WinRateOddsSlipSelector` (`WIN_RATE_ODDS`), `FavoriteOddsSlipAlgorithm` (`FAVORITE`).
+- **Data-dependent algorithm** (needs repositories/services): put it in `pick/infrastructure/algorithm/` as a `@Component` implementing the domain port.
+
+One bean with a unique `code()` is all it takes — the algorithm then automatically appears in `GET /api/picks/algorithms`, runs in `POST /api/picks/simulate`, and shows up in the frontend comparison dashboard. Duplicate codes fail fast at startup. Simulation KPIs are aggregated from persisted `pick_mstr` rows by `PickKpiService` (`GET /api/picks/kpis?bgngYmd=&endYmd=&groupBy=day|round&algorithmCodes=`).
+
+## Statistical analysis via MCP
+
+`.mcp.json` registers the `kbo-mysql` MCP server (`@benborla29/mcp-server-mysql`) so Claude can query the `kbo` schema directly — e.g. analyze `baseball_result` win rates/odds distributions to design and sanity-check new pick algorithms before implementing them.
+
+- Requires the `KBO_DB_PASSWORD` environment variable (set once with `setx KBO_DB_PASSWORD "<password>"`; the password is not committed).
+- The server is query-only: `ALLOW_INSERT/UPDATE/DELETE_OPERATION` are all `false`. Verify findings with read-only SQL, then codify the strategy as a `PickAlgorithm` implementation and backtest it via the simulation.
 
 ## Backend architecture (baseballApi)
 

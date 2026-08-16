@@ -37,6 +37,9 @@ class PickMasterJpaEntity {
     @Column(name = "user_name", nullable = false, length = 20)
     private String userName;
 
+    @Column(name = "algorithm_code", length = 30)
+    private String algorithmCode;
+
     @Column(name = "input_money", nullable = false)
     private BigDecimal inputMoney;
 

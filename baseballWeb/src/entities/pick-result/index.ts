@@ -1,9 +1,20 @@
 export type {
   PickResult,
   PickDetail,
+  PickAlgorithmInfo,
   PickSimulationParams,
-  PickSimulationSummary,
-  PickSimulationDay,
+  SimulationAlgorithmRun,
   PickSimulationResult,
+  KpiGroupBy,
+  PickKpiParams,
+  KpiSummary,
+  PeriodKpi,
+  AlgorithmKpi,
+  PickKpiResult,
 } from "./model/types";
-export { fetchPickResults, simulatePicks } from "./api/pickResultApi";
+export {
+  fetchPickResults,
+  fetchAlgorithms,
+  simulatePicks,
+  fetchPickKpis,
+} from "./api/pickResultApi";

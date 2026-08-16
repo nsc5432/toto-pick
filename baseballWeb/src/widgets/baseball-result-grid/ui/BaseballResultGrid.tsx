@@ -3,14 +3,11 @@ import { useEffect, useState, useTransition } from "react";
 import { fetchBaseballResults } from "@/entities/baseball-result";
 import type { BaseballResult } from "@/entities/baseball-result";
 import type { PageResponse } from "@/shared/api";
+import { isAbortError } from "@/shared/lib";
 
 import "./BaseballResultGrid.css";
 
 const PAGE_SIZE = 20;
-
-function isAbortError(err: unknown): boolean {
-  return err instanceof DOMException && err.name === "AbortError";
-}
 
 export function BaseballResultGrid() {
   const [page, setPage] = useState(0);

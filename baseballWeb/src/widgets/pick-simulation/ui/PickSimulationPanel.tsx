@@ -1,7 +1,8 @@
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
-import { simulatePicks } from "@/entities/pick-result";
-import type { PickSimulationResult } from "@/entities/pick-result";
+import { fetchAlgorithms, simulatePicks } from "@/entities/pick-result";
+import type { PickAlgorithmInfo, PickSimulationResult } from "@/entities/pick-result";
+import { formatMoney, formatRate, isAbortError } from "@/shared/lib";
 
 import "./PickSimulationPanel.css";
 
@@ -40,40 +41,88 @@ const FIELDS: FieldConfig[] = [
   { key: "combinedN", label: "조합수(N)" },
 ];
 
-function isAbortError(err: unknown): boolean {
-  return err instanceof DOMException && err.name === "AbortError";
-}
-
-function formatMoney(value: number): string {
-  return value.toLocaleString();
-}
-
-function formatProfitRate(value: number | null): string {
-  return value === null ? "-" : `${(value * 100).toFixed(1)}%`;
+export interface KpiQuery {
+  bgngYmd: string;
+  endYmd: string;
+  algorithmCodes: string[];
 }
 
 interface PickSimulationPanelProps {
-  onCompleted?: () => void;
+  /** refresh=true면 새 시뮬레이션이 수행되어 하위 목록/대시보드를 다시 불러와야 한다. */
+  onQuery?: (query: KpiQuery, refresh: boolean) => void;
 }
 
-export function PickSimulationPanel({ onCompleted }: PickSimulationPanelProps) {
+export function PickSimulationPanel({ onQuery }: PickSimulationPanelProps) {
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
+  const [algorithms, setAlgorithms] = useState<PickAlgorithmInfo[]>([]);
+  const [checkedCodes, setCheckedCodes] = useState<Set<string>>(new Set());
   const [result, setResult] = useState<PickSimulationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, startTransition] = useTransition();
   const controllerRef = useRef<AbortController | null>(null);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchAlgorithms(controller.signal)
+      .then((list) => {
+        setAlgorithms(list);
+        setCheckedCodes(new Set(list.map((a) => a.code)));
+      })
+      .catch((err) => {
+        if (!isAbortError(err)) {
+          setError(err instanceof Error ? err.message : "알고리즘 목록을 불러오지 못했습니다.");
+        }
+      });
+    return () => controller.abort();
+  }, []);
+
   const handleChange = (key: keyof FormState, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleRun = () => {
+  const toggleAlgorithm = (code: string) => {
+    setCheckedCodes((prev) => {
+      const next = new Set(prev);
+      if (next.has(code)) {
+        next.delete(code);
+      } else {
+        next.add(code);
+      }
+      return next;
+    });
+  };
+
+  const validate = (): KpiQuery | null => {
     if (!/^\d{6}$/.test(form.bgngYmd) || !/^\d{6}$/.test(form.endYmd)) {
       setError("시작/종료일자는 6자리 숫자(YYMMDD)로 입력하세요.");
-      return;
+      return null;
     }
     if (form.bgngYmd > form.endYmd) {
       setError("시작일자는 종료일자보다 클 수 없습니다.");
+      return null;
+    }
+    if (checkedCodes.size === 0) {
+      setError("알고리즘을 1개 이상 선택하세요.");
+      return null;
+    }
+    setError(null);
+    return {
+      bgngYmd: form.bgngYmd,
+      endYmd: form.endYmd,
+      algorithmCodes: [...checkedCodes],
+    };
+  };
+
+  const handleQueryOnly = () => {
+    const query = validate();
+    if (query) {
+      onQuery?.(query, false);
+    }
+  };
+
+  const handleRun = () => {
+    const query = validate();
+    if (!query) {
       return;
     }
 
@@ -85,19 +134,20 @@ export function PickSimulationPanel({ onCompleted }: PickSimulationPanelProps) {
       try {
         const body = await simulatePicks(
           {
-            bgngYmd: form.bgngYmd,
-            endYmd: form.endYmd,
+            bgngYmd: query.bgngYmd,
+            endYmd: query.endYmd,
             num: Number(form.num),
             x: Number(form.x),
             y: Number(form.y),
             inputMoney: Number(form.inputMoney),
             combinedN: Number(form.combinedN),
+            algorithmCodes: query.algorithmCodes,
           },
           controller.signal,
         );
         setResult(body);
         setError(null);
-        onCompleted?.();
+        onQuery?.(query, true);
       } catch (err) {
         if (!isAbortError(err)) {
           setError(err instanceof Error ? err.message : "시뮬레이션을 실행하지 못했습니다.");
@@ -108,10 +158,10 @@ export function PickSimulationPanel({ onCompleted }: PickSimulationPanelProps) {
 
   return (
     <section className="pick-simulation">
-      <h1>PICK 시뮬레이션 (NSC)</h1>
+      <h1>알고리즘 시뮬레이션 (NSC)</h1>
       <p className="pick-simulation__description">
-        기간 내 야구 승1패 경기를 대상으로, 최근 승률 상위/하위 5위 팀과 배당의 괴리를 이용해
-        픽을 생성·정산하고 일자별 KPI를 보여줍니다.
+        기간 내 야구 승1패 경기를 대상으로 선택한 알고리즘들의 픽을 생성·정산하고, 알고리즘별
+        KPI(수익률·적중률)를 비교합니다.
       </p>
 
       <div className="pick-simulation__form">
@@ -125,78 +175,56 @@ export function PickSimulationPanel({ onCompleted }: PickSimulationPanelProps) {
             />
           </label>
         ))}
-        <button
-          type="button"
-          className="pick-simulation__button"
-          onClick={handleRun}
-          disabled={loading}
-        >
-          {loading ? "실행 중..." : "시뮬레이션 실행"}
-        </button>
+      </div>
+
+      <div className="pick-simulation__algorithms">
+        <span className="pick-simulation__algorithms-label">알고리즘</span>
+        {algorithms.map((algorithm) => (
+          <label key={algorithm.code} className="pick-simulation__algorithm">
+            <input
+              type="checkbox"
+              checked={checkedCodes.has(algorithm.code)}
+              onChange={() => toggleAlgorithm(algorithm.code)}
+            />
+            <span>
+              {algorithm.name} ({algorithm.code})
+            </span>
+          </label>
+        ))}
+        {algorithms.length === 0 && (
+          <span className="pick-simulation__algorithms-empty">등록된 알고리즘이 없습니다.</span>
+        )}
+        <div className="pick-simulation__actions">
+          <button
+            type="button"
+            className="pick-simulation__button"
+            onClick={handleRun}
+            disabled={loading}
+          >
+            {loading ? "실행 중..." : "시뮬레이션 실행"}
+          </button>
+          <button
+            type="button"
+            className="pick-simulation__button"
+            onClick={handleQueryOnly}
+            disabled={loading}
+          >
+            KPI 조회
+          </button>
+        </div>
       </div>
 
       {error && <p className="pick-simulation__error">{error}</p>}
 
-      {result && (
-        <>
-          <p className="pick-simulation__summary">
-            대상일 {result.summary.dayCount}일 / 조합 {result.summary.slipCount}건 / 적중{" "}
-            {result.summary.hitCount}건 / 투입 {formatMoney(result.summary.inputTotal)} / 회수{" "}
-            {formatMoney(result.summary.outputTotal)} / 수익률{" "}
-            {formatProfitRate(result.summary.profitRate)}
+      {result &&
+        result.algorithms.map((run) => (
+          <p key={run.algorithmCode} className="pick-simulation__summary">
+            [{run.algorithmName}] 대상일 {run.dayCount}일 / 조합 {run.slipCount}건 / 적중{" "}
+            {run.hitCount}건 (적중률 {formatRate(run.hitRate)}) / 투입{" "}
+            {formatMoney(run.inputTotal)} / 회수 {formatMoney(run.outputTotal)} / 수익률{" "}
+            {formatRate(run.profitRate)}
           </p>
-
-          <div className="pick-simulation__table-wrap">
-            <table className="pick-simulation__table">
-              <thead>
-                <tr>
-                  <th>일자</th>
-                  <th>년도</th>
-                  <th>회차</th>
-                  <th>조합수</th>
-                  <th>적중수</th>
-                  <th>투입금액</th>
-                  <th>회수금액</th>
-                  <th>수익률</th>
-                </tr>
-              </thead>
-              <tbody>
-                {result.days.map((day) => (
-                  <tr key={`${day.ymd}-${day.year}-${day.round}`}>
-                    <td>{day.ymd}</td>
-                    <td>{day.year}</td>
-                    <td>{day.round}</td>
-                    <td>{day.slipCount}</td>
-                    <td>{day.hitCount}</td>
-                    <td>{formatMoney(day.inputTotal)}</td>
-                    <td>{formatMoney(day.outputTotal)}</td>
-                    <td>{formatProfitRate(day.profitRate)}</td>
-                  </tr>
-                ))}
-                {result.days.length === 0 && (
-                  <tr>
-                    <td colSpan={8} className="pick-simulation__empty">
-                      기간 내 대상 경기가 없습니다.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-              {result.days.length > 0 && (
-                <tfoot>
-                  <tr>
-                    <td colSpan={3}>합계</td>
-                    <td>{result.summary.slipCount}</td>
-                    <td>{result.summary.hitCount}</td>
-                    <td>{formatMoney(result.summary.inputTotal)}</td>
-                    <td>{formatMoney(result.summary.outputTotal)}</td>
-                    <td>{formatProfitRate(result.summary.profitRate)}</td>
-                  </tr>
-                </tfoot>
-              )}
-            </table>
-          </div>
-        </>
-      )}
+        ))}
     </section>
   );
 }

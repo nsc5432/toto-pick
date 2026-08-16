@@ -48,6 +48,37 @@ export interface PickSimulationResult {
   algorithms: SimulationAlgorithmRun[];
 }
 
+export interface PickSlipLeg {
+  resultId: number;
+  ymd: string | null;
+  home: string | null;
+  away: string | null;
+  /** 픽한 결과: "승"(홈승) / "1"(무) / "패"(원정승) */
+  predicted: string;
+  /** 픽한 쪽의 발표 배당 (발표 배당이 없는 경기는 null) */
+  backedOdds: number | null;
+  actualResult: string | null;
+  legHit: boolean;
+}
+
+export interface PickSlip {
+  id: number;
+  year: number;
+  round: number;
+  ymd: string | null;
+  algorithmCode: string;
+  inputMoney: number;
+  outputMoney: number | null;
+  hit: boolean;
+  legs: PickSlipLeg[];
+}
+
+export interface PickSlipParams {
+  bgngYmd: string;
+  endYmd: string;
+  algorithmCodes?: string[];
+}
+
 export type KpiGroupBy = "day" | "round";
 
 export interface PickKpiParams {

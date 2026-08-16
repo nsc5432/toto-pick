@@ -28,4 +28,11 @@ public interface PickMasterRepository {
      * Null/empty {@code algorithmCodes} means every pick whose algorithm_code is non-null.
      */
     List<PickKpiRow> findKpiRows(String userName, List<String> algorithmCodes, String ymdFrom, String ymdTo);
+
+    /**
+     * Full masters (with details) for the user's algorithm-generated picks within the ymd range —
+     * the read model behind the slip-composition view. Null/empty {@code algorithmCodes} means
+     * every pick whose algorithm_code is non-null.
+     */
+    List<PickMaster> findWithDetails(String userName, List<String> algorithmCodes, String ymdFrom, String ymdTo);
 }

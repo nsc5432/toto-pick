@@ -9,5 +9,7 @@ interface PickDetailJpaRepository extends JpaRepository<PickDetailJpaEntity, Pic
 
     List<PickDetailJpaEntity> findByPickMasterId(Integer pickMasterId);
 
+    List<PickDetailJpaEntity> findByPickMasterIdIn(Collection<Integer> pickMasterIds);
+
     void deleteByPickMasterIdIn(Collection<Integer> pickMasterIds);
 }

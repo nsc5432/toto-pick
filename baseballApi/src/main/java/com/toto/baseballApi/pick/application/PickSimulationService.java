@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.toto.baseballApi.baseballresult.domain.BaseballResult;
 import com.toto.baseballApi.baseballresult.domain.BaseballResultRepository;
 import com.toto.baseballApi.pick.domain.AlgorithmParams;
+import com.toto.baseballApi.pick.domain.MartingaleStaking;
 import com.toto.baseballApi.pick.domain.PickAlgorithm;
 import com.toto.baseballApi.pick.domain.PickBacktester;
 import com.toto.baseballApi.pick.domain.PickMaster;
@@ -21,6 +22,7 @@ import com.toto.baseballApi.pick.domain.PickMasterRepository;
 import com.toto.baseballApi.pick.domain.PickUniverse;
 import com.toto.baseballApi.pick.domain.SettledSlip;
 import com.toto.baseballApi.pick.domain.SlipSelectionInput;
+import com.toto.baseballApi.pick.domain.StakingAlgorithm;
 import com.toto.baseballApi.pick.domain.TeamFormIndex;
 
 /**
@@ -124,9 +126,15 @@ public class PickSimulationService {
         BigDecimal inputTotal = BigDecimal.ZERO;
         BigDecimal outputTotal = BigDecimal.ZERO;
 
+        // One staking session per run; the persisted simulation runs with empty params, so the
+        // session sizes stakes off the algorithm's declared defaults (e.g. targetProfit).
+        MartingaleStaking staking = algorithm instanceof StakingAlgorithm stakingAlgorithm
+                ? stakingAlgorithm.newStakingSession(AlgorithmParams.empty())
+                : null;
+
         for (DayKey day : dayKeys) {
             DayTotals totals = simulateDay(
-                    algorithm, day, gamesByDay.get(day), historyGames, formIndex, command);
+                    algorithm, day, gamesByDay.get(day), historyGames, formIndex, command, staking);
             dayCount++;
             slipCount += totals.slipCount();
             hitCount += totals.hitCount();
@@ -143,7 +151,8 @@ public class PickSimulationService {
 
     private DayTotals simulateDay(
             PickAlgorithm algorithm, DayKey day, List<BaseballResult> dayGames,
-            List<BaseballResult> historyGames, TeamFormIndex formIndex, SimulatePicksCommand command) {
+            List<BaseballResult> historyGames, TeamFormIndex formIndex, SimulatePicksCommand command,
+            MartingaleStaking staking) {
         // Rolling window: only games strictly before this day feed the win-rate ranking.
         List<BaseballResult> priorGames = historyGames.stream()
                 .filter(g -> g.ymd().compareTo(day.ymd()) < 0)
@@ -155,24 +164,29 @@ public class PickSimulationService {
         SlipSelectionInput input = new SlipSelectionInput(
                 day.ymd(), command.num(), command.x(), command.y(), command.combinedN(),
                 dayGames, priorGames, formIndex, AlgorithmParams.empty());
-        List<SettledSlip> slips = PickBacktester.runDay(
-                algorithm, input, dayGamesById, command.inputMoney());
+        List<SettledSlip> slips = staking == null
+                ? PickBacktester.runDay(algorithm, input, dayGamesById, command.inputMoney())
+                : PickBacktester.runStakedDay((StakingAlgorithm) algorithm, input, dayGamesById,
+                        day.year(), day.round(), staking);
 
         int hits = 0;
+        BigDecimal inputSum = BigDecimal.ZERO;
         BigDecimal outputSum = BigDecimal.ZERO;
         for (SettledSlip slip : slips) {
+            // slip.inputMoney() is the actual stake: the flat request amount on the flat path, the
+            // martingale-sized stake on the staked path — pick_mstr.input_money stores either as-is.
             pickMasterRepository.save(new PickMaster(
                     null, day.year(), day.round(), day.ymd(),
-                    SIMULATION_USER_NAME, algorithm.code(), command.inputMoney(), slip.outputMoney(),
+                    SIMULATION_USER_NAME, algorithm.code(), slip.inputMoney(), slip.outputMoney(),
                     slip.details()));
 
             if (slip.hit()) {
                 hits++;
             }
+            inputSum = inputSum.add(slip.inputMoney());
             outputSum = outputSum.add(slip.outputMoney());
         }
 
-        BigDecimal inputSum = command.inputMoney().multiply(BigDecimal.valueOf(slips.size()));
         return new DayTotals(slips.size(), hits, inputSum, outputSum);
     }
 }

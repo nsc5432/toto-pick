@@ -29,15 +29,55 @@ public final class PickBacktester {
         List<PickSlip> slips = algorithm.selectSlips(input);
         List<SettledSlip> settled = new ArrayList<>(slips.size());
         for (PickSlip slip : slips) {
-            List<PickDetail> details = slip.selections().stream()
-                    .map(s -> new PickDetail(null, s.resultId(), s.predictedTotalResult()))
-                    .toList();
-            settled.add(new SettledSlip(
-                    details, inputMoney,
-                    PickSettlement.settle(details, dayGamesById, inputMoney),
-                    PickSettlement.marketExpectation(details, dayGamesById, inputMoney),
-                    PickSettlement.legTally(details, dayGamesById)));
+            List<PickDetail> details = toDetails(slip);
+            settled.add(settle(details, dayGamesById, inputMoney));
         }
         return settled;
+    }
+
+    /**
+     * The staked counterpart of {@link #runDay}: the stake comes from the algorithm's own
+     * {@link MartingaleStaking} session instead of a flat {@code inputMoney}, and the session is
+     * told the outcome so the next day's stake sees it.
+     *
+     * <p>Only the algorithm's first slip is considered — a staking algorithm bets one slip per day
+     * by design (R2). An empty return means "no bet today" (no slip, no published odds, or the
+     * round budget is spent) and leaves the session untouched. Days must be fed in ymd order:
+     * the fold is what makes the martingale path real, so the caller must not parallelize or
+     * reorder days within one session.
+     */
+    public static List<SettledSlip> runStakedDay(
+            StakingAlgorithm algorithm, SlipSelectionInput input,
+            Map<Integer, BaseballResult> dayGamesById,
+            Integer year, Integer round, MartingaleStaking staking) {
+
+        List<PickSlip> slips = algorithm.selectSlips(input);
+        if (slips.isEmpty()) {
+            return List.of();
+        }
+        List<PickDetail> details = toDetails(slips.get(0));
+        BigDecimal combinedOdds = PickSettlement.combinedBackedOdds(details, dayGamesById);
+        BigDecimal stake = staking.nextStake(year, round, combinedOdds);
+        if (stake == null) {
+            return List.of();
+        }
+        SettledSlip settled = settle(details, dayGamesById, stake);
+        staking.settle(year, round, stake, settled.hit());
+        return List.of(settled);
+    }
+
+    private static List<PickDetail> toDetails(PickSlip slip) {
+        return slip.selections().stream()
+                .map(s -> new PickDetail(null, s.resultId(), s.predictedTotalResult()))
+                .toList();
+    }
+
+    private static SettledSlip settle(
+            List<PickDetail> details, Map<Integer, BaseballResult> dayGamesById, BigDecimal stake) {
+        return new SettledSlip(
+                details, stake,
+                PickSettlement.settle(details, dayGamesById, stake),
+                PickSettlement.marketExpectation(details, dayGamesById, stake),
+                PickSettlement.legTally(details, dayGamesById));
     }
 }

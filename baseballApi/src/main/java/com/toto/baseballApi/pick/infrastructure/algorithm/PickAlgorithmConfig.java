@@ -3,6 +3,7 @@ package com.toto.baseballApi.pick.infrastructure.algorithm;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import com.toto.baseballApi.pick.domain.FavoriteMartingaleAlgorithm;
 import com.toto.baseballApi.pick.domain.FavoriteOddsSlipAlgorithm;
 import com.toto.baseballApi.pick.domain.MarketEdgeSlipAlgorithm;
 import com.toto.baseballApi.pick.domain.PickAlgorithm;
@@ -30,5 +31,10 @@ class PickAlgorithmConfig {
     @Bean
     PickAlgorithm marketEdgeAlgorithm() {
         return new MarketEdgeSlipAlgorithm();
+    }
+
+    @Bean
+    PickAlgorithm favoriteMartingaleAlgorithm() {
+        return new FavoriteMartingaleAlgorithm();
     }
 }

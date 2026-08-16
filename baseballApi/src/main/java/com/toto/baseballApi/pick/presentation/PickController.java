@@ -22,12 +22,14 @@ import com.toto.baseballApi.pick.application.PickKpiQuery;
 import com.toto.baseballApi.pick.application.PickKpiService;
 import com.toto.baseballApi.pick.application.PickService;
 import com.toto.baseballApi.pick.application.PickSimulationService;
+import com.toto.baseballApi.pick.application.PickSlipQueryService;
 import com.toto.baseballApi.pick.application.SimulatePicksCommand;
 import com.toto.baseballApi.pick.domain.PickSelection;
 import com.toto.baseballApi.pick.presentation.dto.AlgorithmResponse;
 import com.toto.baseballApi.pick.presentation.dto.CreatePickRequest;
 import com.toto.baseballApi.pick.presentation.dto.PickKpiResponse;
 import com.toto.baseballApi.pick.presentation.dto.PickResponse;
+import com.toto.baseballApi.pick.presentation.dto.PickSlipResponse;
 import com.toto.baseballApi.pick.presentation.dto.SimulatePicksRequest;
 import com.toto.baseballApi.pick.presentation.dto.SimulationResponse;
 
@@ -42,6 +44,7 @@ public class PickController {
     private final PickService pickService;
     private final PickSimulationService pickSimulationService;
     private final PickKpiService pickKpiService;
+    private final PickSlipQueryService pickSlipQueryService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -94,6 +97,17 @@ public class PickController {
                 PickKpiQuery.GroupBy.valueOf(groupBy.toUpperCase(Locale.ROOT)),
                 algorithmCodes);
         return PickKpiResponse.from(pickKpiService.kpis(query));
+    }
+
+    /** 시뮬레이션 슬립의 실제 조합(어떤 경기를 어떻게 묶었는지)을 레그 단위로 조회한다. */
+    @GetMapping("/slips")
+    public List<PickSlipResponse> slips(
+            @RequestParam String bgngYmd,
+            @RequestParam String endYmd,
+            @RequestParam(required = false) List<String> algorithmCodes) {
+        return pickSlipQueryService.slips(bgngYmd, endYmd, algorithmCodes).stream()
+                .map(PickSlipResponse::from)
+                .toList();
     }
 
     @PostMapping("/{id}/settle")

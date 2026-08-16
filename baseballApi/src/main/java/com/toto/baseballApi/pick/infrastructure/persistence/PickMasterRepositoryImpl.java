@@ -1,7 +1,9 @@
 package com.toto.baseballApi.pick.infrastructure.persistence;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -91,6 +93,28 @@ class PickMasterRepositoryImpl implements PickMasterRepository {
                 .map(m -> new PickKpiRow(
                         m.getAlgorithmCode(), m.getYmd(), m.getYear(), m.getRound(),
                         m.getInputMoney(), m.getOutputMoney()))
+                .toList();
+    }
+
+    @Override
+    public List<PickMaster> findWithDetails(
+            String userName, List<String> algorithmCodes, String ymdFrom, String ymdTo) {
+        List<PickMasterJpaEntity> masters = (algorithmCodes == null || algorithmCodes.isEmpty())
+                ? pickMasterJpaRepository.findByUserNameAndAlgorithmCodeIsNotNullAndYmdBetween(
+                        userName, ymdFrom, ymdTo)
+                : pickMasterJpaRepository.findByUserNameAndAlgorithmCodeInAndYmdBetween(
+                        userName, algorithmCodes, ymdFrom, ymdTo);
+        if (masters.isEmpty()) {
+            return List.of();
+        }
+        // One batched detail query instead of one per master — a season of slips is hundreds of rows.
+        Map<Integer, List<PickDetailJpaEntity>> detailsByMasterId = pickDetailJpaRepository
+                .findByPickMasterIdIn(masters.stream().map(PickMasterJpaEntity::getId).toList())
+                .stream()
+                .collect(Collectors.groupingBy(PickDetailJpaEntity::getPickMasterId));
+        return masters.stream()
+                .map(master -> toDomain(master,
+                        detailsByMasterId.getOrDefault(master.getId(), List.of())))
                 .toList();
     }
 

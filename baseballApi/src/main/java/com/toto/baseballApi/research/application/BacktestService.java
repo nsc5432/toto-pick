@@ -16,11 +16,13 @@ import com.toto.baseballApi.baseballresult.domain.BaseballResult;
 import com.toto.baseballApi.baseballresult.domain.BaseballResultRepository;
 import com.toto.baseballApi.pick.domain.AlgorithmParams;
 import com.toto.baseballApi.pick.domain.LegTally;
+import com.toto.baseballApi.pick.domain.MartingaleStaking;
 import com.toto.baseballApi.pick.domain.PickAlgorithm;
 import com.toto.baseballApi.pick.domain.PickBacktester;
 import com.toto.baseballApi.pick.domain.PickUniverse;
 import com.toto.baseballApi.pick.domain.SettledSlip;
 import com.toto.baseballApi.pick.domain.SlipSelectionInput;
+import com.toto.baseballApi.pick.domain.StakingAlgorithm;
 import com.toto.baseballApi.pick.domain.TeamFormIndex;
 import com.toto.baseballApi.research.domain.BacktestMetrics;
 import com.toto.baseballApi.research.domain.BacktestWindow;
@@ -104,29 +106,39 @@ public class BacktestService {
             PickAlgorithm algorithm, AlgorithmParams params, BacktestData data,
             BacktestWindow window, BacktestSettings settings) {
 
+        // One staking session per evaluate() call: candidates sweep on parallel threads, but each
+        // gets its own session here, and the day loop below stays a sequential ymd-ordered fold —
+        // both are what makes a path-dependent stake rule safe inside a parallel sweep.
+        MartingaleStaking staking = algorithm instanceof StakingAlgorithm stakingAlgorithm
+                ? stakingAlgorithm.newStakingSession(params)
+                : null;
+
         List<DayOutcome> outcomes = new ArrayList<>();
         for (BacktestData.PickDay day : data.days()) {
             if (!window.contains(day.ymd())) {
                 continue;
             }
-            outcomes.add(runDay(algorithm, params, data, day, settings));
+            outcomes.add(runDay(algorithm, params, data, day, settings, staking));
         }
         return BacktestMetrics.from(outcomes);
     }
 
     private DayOutcome runDay(
             PickAlgorithm algorithm, AlgorithmParams params, BacktestData data,
-            BacktestData.PickDay day, BacktestSettings settings) {
+            BacktestData.PickDay day, BacktestSettings settings, MartingaleStaking staking) {
 
         SlipSelectionInput input = new SlipSelectionInput(
                 day.ymd(), settings.num(), settings.x(), settings.y(), settings.combinedN(),
                 day.games(), day.priorHistory(data.history()), data.formIndex(),
                 AlgorithmParams.empty()).withParams(params);
 
-        List<SettledSlip> slips = PickBacktester.runDay(
-                algorithm, input, day.gamesById(), settings.inputMoney());
+        List<SettledSlip> slips = staking == null
+                ? PickBacktester.runDay(algorithm, input, day.gamesById(), settings.inputMoney())
+                : PickBacktester.runStakedDay((StakingAlgorithm) algorithm, input, day.gamesById(),
+                        day.year(), day.round(), staking);
 
         int hits = 0;
+        BigDecimal inputTotal = BigDecimal.ZERO;
         BigDecimal outputTotal = BigDecimal.ZERO;
         BigDecimal benchmarkTotal = BigDecimal.ZERO;
         LegTally legs = LegTally.EMPTY;
@@ -134,13 +146,13 @@ public class BacktestService {
             if (slip.hit()) {
                 hits++;
             }
+            inputTotal = inputTotal.add(slip.inputMoney());
             outputTotal = outputTotal.add(slip.outputMoney());
             if (slip.benchmarkOutputMoney() != null) {
                 benchmarkTotal = benchmarkTotal.add(slip.benchmarkOutputMoney());
             }
             legs = legs.plus(slip.legs());
         }
-        BigDecimal inputTotal = settings.inputMoney().multiply(BigDecimal.valueOf(slips.size()));
         return new DayOutcome(
                 day.ymd(), slips.size(), hits, inputTotal, outputTotal, benchmarkTotal, legs);
     }

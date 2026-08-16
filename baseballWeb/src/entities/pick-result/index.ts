@@ -5,6 +5,9 @@ export type {
   PickSimulationParams,
   SimulationAlgorithmRun,
   PickSimulationResult,
+  PickSlipLeg,
+  PickSlip,
+  PickSlipParams,
   KpiGroupBy,
   PickKpiParams,
   KpiSummary,
@@ -17,4 +20,5 @@ export {
   fetchAlgorithms,
   simulatePicks,
   fetchPickKpis,
+  fetchPickSlips,
 } from "./api/pickResultApi";

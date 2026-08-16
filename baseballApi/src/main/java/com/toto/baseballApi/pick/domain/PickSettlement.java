@@ -38,6 +38,28 @@ public final class PickSettlement {
     }
 
     /**
+     * The combined published odds of the backed sides, rounded exactly like {@link #settle} rounds
+     * the realized combined odds (2 dp, ceiling). This is what a stake-sizing rule must quote:
+     * published rows were cross-checked against {@code totalDiv} and matched, so sizing off this
+     * number and settling at {@code totalDiv} quote the same market — sizing off anything else can
+     * produce "hit the slip, missed the target". {@code null} when any leg lacks published odds;
+     * such a day is skipped rather than priced from the backfilled estimates (설계 결정 D2).
+     */
+    public static BigDecimal combinedBackedOdds(
+            List<PickDetail> details, Map<Integer, BaseballResult> gamesById) {
+        BigDecimal combined = BigDecimal.ONE;
+        for (PickDetail detail : details) {
+            BaseballResult game = gamesById.get(detail.resultId());
+            ThreeWayOdds odds = game == null ? null : game.publishedOdds();
+            if (odds == null) {
+                return null;
+            }
+            combined = combined.multiply(BigDecimal.valueOf(backedOdds(odds, detail.totalResult())));
+        }
+        return combined.setScale(2, RoundingMode.CEILING);
+    }
+
+    /**
      * What this slip was worth <em>under the market's own probabilities</em> — the return a bettor
      * with no information whatsoever expects from it.
      *

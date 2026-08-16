@@ -7,6 +7,7 @@ public record PickMaster(
         Integer id,
         Integer year,
         Integer round,
+        String ymd,
         String userName,
         BigDecimal inputMoney,
         BigDecimal outputMoney,

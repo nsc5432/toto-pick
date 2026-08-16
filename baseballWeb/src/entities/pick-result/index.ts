@@ -1,2 +1,9 @@
-export type { PickResult, PickDetail } from "./model/types";
-export { fetchPickResults } from "./api/pickResultApi";
+export type {
+  PickResult,
+  PickDetail,
+  PickSimulationParams,
+  PickSimulationSummary,
+  PickSimulationDay,
+  PickSimulationResult,
+} from "./model/types";
+export { fetchPickResults, simulatePicks } from "./api/pickResultApi";

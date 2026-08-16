@@ -31,6 +31,9 @@ class PickMasterJpaEntity {
     @Column(name = "round", nullable = false)
     private Integer round;
 
+    @Column(name = "ymd", length = 8)
+    private String ymd;
+
     @Column(name = "user_name", nullable = false, length = 20)
     private String userName;
 

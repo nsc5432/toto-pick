@@ -15,4 +15,7 @@ public interface PickMasterRepository {
     Page<PickMaster> findAll(Pageable pageable);
 
     List<PickMaster> findAllPendingSettlement();
+
+    /** Deletes masters (and their details) for the user within the ymd range; returns the master count removed. */
+    int deleteByUserNameAndYmdRange(String userName, String ymdFrom, String ymdTo);
 }

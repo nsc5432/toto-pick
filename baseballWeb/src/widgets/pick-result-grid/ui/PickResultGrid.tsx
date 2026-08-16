@@ -56,6 +56,7 @@ export function PickResultGrid() {
             <tr>
               <th>년도</th>
               <th>회차</th>
+              <th>날짜</th>
               <th>사용자</th>
               <th>투입금액</th>
               <th>적중금액</th>
@@ -67,6 +68,7 @@ export function PickResultGrid() {
               <tr key={row.id}>
                 <td>{row.year}</td>
                 <td>{row.round}</td>
+                <td>{row.ymd ?? "-"}</td>
                 <td>{row.userName}</td>
                 <td>{row.inputMoney.toLocaleString()}</td>
                 <td>{formatMoney(row.outputMoney)}</td>
@@ -75,7 +77,7 @@ export function PickResultGrid() {
             ))}
             {!loading && data?.content.length === 0 && (
               <tr>
-                <td colSpan={6} className="pick-result-grid__empty">
+                <td colSpan={7} className="pick-result-grid__empty">
                   데이터가 없습니다.
                 </td>
               </tr>

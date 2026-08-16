@@ -17,9 +17,13 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.toto.baseballApi.pick.application.CreatePickCommand;
 import com.toto.baseballApi.pick.application.PickService;
+import com.toto.baseballApi.pick.application.PickSimulationService;
+import com.toto.baseballApi.pick.application.SimulatePicksCommand;
 import com.toto.baseballApi.pick.domain.PickSelection;
 import com.toto.baseballApi.pick.presentation.dto.CreatePickRequest;
 import com.toto.baseballApi.pick.presentation.dto.PickResponse;
+import com.toto.baseballApi.pick.presentation.dto.SimulatePicksRequest;
+import com.toto.baseballApi.pick.presentation.dto.SimulationResponse;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +34,7 @@ import lombok.RequiredArgsConstructor;
 public class PickController {
 
     private final PickService pickService;
+    private final PickSimulationService pickSimulationService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -49,6 +54,20 @@ public class PickController {
                 manualPicks);
 
         return PickResponse.from(pickService.createPick(command));
+    }
+
+    @PostMapping("/simulate")
+    public SimulationResponse simulate(@Valid @RequestBody SimulatePicksRequest request) {
+        SimulatePicksCommand command = new SimulatePicksCommand(
+                request.bgngYmd(),
+                request.endYmd(),
+                request.num(),
+                request.x(),
+                request.y(),
+                request.inputMoney(),
+                request.combinedN());
+
+        return SimulationResponse.from(pickSimulationService.simulate(command));
     }
 
     @PostMapping("/{id}/settle")

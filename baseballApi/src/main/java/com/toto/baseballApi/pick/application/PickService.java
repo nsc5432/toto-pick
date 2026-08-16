@@ -1,7 +1,6 @@
 package com.toto.baseballApi.pick.application;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -17,6 +16,7 @@ import com.toto.baseballApi.pick.domain.PickDetail;
 import com.toto.baseballApi.pick.domain.PickMaster;
 import com.toto.baseballApi.pick.domain.PickMasterRepository;
 import com.toto.baseballApi.pick.domain.PickSelection;
+import com.toto.baseballApi.pick.domain.PickSettlement;
 
 import lombok.RequiredArgsConstructor;
 
@@ -61,6 +61,7 @@ public class PickService {
                 null,
                 command.year(),
                 command.round(),
+                null,
                 command.userName(),
                 command.inputMoney(),
                 null,
@@ -80,31 +81,14 @@ public class PickService {
         Map<Integer, BaseballResult> actualResultsById = baseballResultRepository.findAllById(resultIds).stream()
                 .collect(Collectors.toMap(BaseballResult::id, r -> r));
 
-        boolean allHit = true;
-        BigDecimal combinedOdds = BigDecimal.ONE;
-        for (PickDetail detail : pickMaster.details()) {
-            BaseballResult actual = actualResultsById.get(detail.resultId());
-            if (actual == null || !actual.totalResult().equals(detail.totalResult())) {
-                allHit = false;
-                break;
-            }
-            combinedOdds = combinedOdds.multiply(BigDecimal.valueOf(actual.totalDiv()));
-        }
-
-        BigDecimal outputMoney;
-        if (allHit) {
-            // "소수 둘째에서 올림" — round the combined odds UP at the 2nd decimal place.
-            combinedOdds = combinedOdds.setScale(2, RoundingMode.CEILING);
-            outputMoney = combinedOdds.multiply(pickMaster.inputMoney())
-                    .setScale(0, RoundingMode.HALF_UP);
-        } else {
-            outputMoney = BigDecimal.ZERO;
-        }
+        BigDecimal outputMoney = PickSettlement.settle(
+                pickMaster.details(), actualResultsById, pickMaster.inputMoney());
 
         PickMaster settled = new PickMaster(
                 pickMaster.id(),
                 pickMaster.year(),
                 pickMaster.round(),
+                pickMaster.ymd(),
                 pickMaster.userName(),
                 pickMaster.inputMoney(),
                 outputMoney,

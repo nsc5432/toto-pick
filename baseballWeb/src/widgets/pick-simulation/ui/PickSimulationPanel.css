@@ -1,0 +1,100 @@
+.pick-simulation {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 24px 0;
+  font-family: system-ui, sans-serif;
+  text-align: left;
+}
+
+.pick-simulation__description {
+  font-size: 14px;
+  color: #555;
+  margin: 0 0 16px;
+}
+
+.pick-simulation__form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 16px 20px;
+}
+
+.pick-simulation__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: #555;
+}
+
+.pick-simulation__field input {
+  width: 110px;
+  padding: 5px 8px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+}
+
+.pick-simulation__button {
+  padding: 6px 16px;
+  cursor: pointer;
+}
+
+.pick-simulation__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.pick-simulation__error {
+  color: #c0392b;
+}
+
+.pick-simulation__summary {
+  font-size: 14px;
+  margin: 16px 0 8px;
+  font-weight: 600;
+}
+
+.pick-simulation__table-wrap {
+  overflow-x: auto;
+}
+
+.pick-simulation__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.pick-simulation__table th,
+.pick-simulation__table td {
+  border: 1px solid #ddd;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+
+.pick-simulation__table th {
+  background: #f5f5f5;
+  text-align: center;
+}
+
+.pick-simulation__table td {
+  text-align: right;
+}
+
+.pick-simulation__table td:nth-child(-n + 3) {
+  text-align: center;
+}
+
+.pick-simulation__table tfoot td {
+  background: #fafafa;
+  font-weight: 600;
+}
+
+.pick-simulation__empty {
+  text-align: center !important;
+  padding: 24px;
+  color: #888;
+}

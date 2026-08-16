@@ -50,6 +50,24 @@ class BaseballResultRepositoryImpl implements BaseballResultRepository {
     }
 
     @Override
+    public List<BaseballResult> findByGameTypeAndTournamentsAndYmdBetween(
+            String gameType, Collection<String> tournaments, String ymdFrom, String ymdTo) {
+        return baseballResultJpaRepository
+                .findByGameTypeAndTournamentInAndYmdBetween(gameType, tournaments, ymdFrom, ymdTo).stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<BaseballResult> findByGameTypeAndTournamentsAndYmdBefore(
+            String gameType, Collection<String> tournaments, String ymdExclusive) {
+        return baseballResultJpaRepository
+                .findByGameTypeAndTournamentInAndYmdLessThan(gameType, tournaments, ymdExclusive).stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
     @Transactional
     public int updateDivs(List<DivUpdate> updates) {
         Map<Integer, DivUpdate> updatesById = updates.stream()

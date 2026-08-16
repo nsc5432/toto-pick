@@ -36,7 +36,7 @@
   text-align: right;
 }
 
-.pick-result-grid__table td:nth-child(-n + 3) {
+.pick-result-grid__table td:nth-child(-n + 4) {
   text-align: center;
 }
 

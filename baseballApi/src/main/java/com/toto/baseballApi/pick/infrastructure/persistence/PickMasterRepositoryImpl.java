@@ -6,6 +6,7 @@ import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.toto.baseballApi.pick.domain.PickDetail;
 import com.toto.baseballApi.pick.domain.PickMaster;
@@ -59,11 +60,29 @@ class PickMasterRepositoryImpl implements PickMasterRepository {
                 .toList();
     }
 
+    @Override
+    @Transactional
+    public int deleteByUserNameAndYmdRange(String userName, String ymdFrom, String ymdTo) {
+        List<PickMasterJpaEntity> masters =
+                pickMasterJpaRepository.findByUserNameAndYmdBetween(userName, ymdFrom, ymdTo);
+        if (masters.isEmpty()) {
+            return 0;
+        }
+        List<Integer> masterIds = masters.stream().map(PickMasterJpaEntity::getId).toList();
+        pickDetailJpaRepository.deleteByPickMasterIdIn(masterIds);
+        // The derived delete is queued in the persistence context; flush it so the detail rows are
+        // gone before the bulk master delete below hits the pick_dtl -> pick_mstr FK constraint.
+        pickDetailJpaRepository.flush();
+        pickMasterJpaRepository.deleteAllInBatch(masters);
+        return masters.size();
+    }
+
     private PickMasterJpaEntity toMasterEntity(PickMaster pickMaster) {
         return new PickMasterJpaEntity(
                 pickMaster.id(),
                 pickMaster.year(),
                 pickMaster.round(),
+                pickMaster.ymd(),
                 pickMaster.userName(),
                 pickMaster.inputMoney(),
                 pickMaster.outputMoney());
@@ -78,6 +97,7 @@ class PickMasterRepositoryImpl implements PickMasterRepository {
                 master.getId(),
                 master.getYear(),
                 master.getRound(),
+                master.getYmd(),
                 master.getUserName(),
                 master.getInputMoney(),
                 master.getOutputMoney(),

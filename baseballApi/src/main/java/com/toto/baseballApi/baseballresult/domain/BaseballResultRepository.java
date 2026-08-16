@@ -13,4 +13,9 @@ public interface BaseballResultRepository {
     List<BaseballResult> findByYearAndRound(Integer year, Integer round);
 
     List<BaseballResult> findAllById(Collection<Integer> ids);
+
+    List<BaseballResult> findByGameType(String gameType);
+
+    /** Applies the given per-row odds and returns the number of rows actually updated. */
+    int updateDivs(List<DivUpdate> updates);
 }

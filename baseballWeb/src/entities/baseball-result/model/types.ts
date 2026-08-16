@@ -13,4 +13,13 @@ export interface BaseballResult {
   res2: number | null;
   totalResult: string;
   totalDiv: number;
+  homeDiv: number | null;
+  drawDiv: number | null;
+  awayDiv: number | null;
+}
+
+export interface DivBackfillResult {
+  target: number;
+  updated: number;
+  skipped: number;
 }

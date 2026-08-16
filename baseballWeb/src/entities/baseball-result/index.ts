@@ -1,2 +1,2 @@
-export type { BaseballResult } from "./model/types";
-export { fetchBaseballResults } from "./api/baseballResultApi";
+export type { BaseballResult, DivBackfillResult } from "./model/types";
+export { fetchBaseballResults, backfillBaseballResultDivs } from "./api/baseballResultApi";

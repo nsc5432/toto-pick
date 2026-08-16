@@ -7,4 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 interface BaseballResultJpaRepository extends JpaRepository<BaseballResultJpaEntity, Integer> {
 
     List<BaseballResultJpaEntity> findByYearAndRound(Integer year, Integer round);
+
+    List<BaseballResultJpaEntity> findByGameType(String gameType);
 }

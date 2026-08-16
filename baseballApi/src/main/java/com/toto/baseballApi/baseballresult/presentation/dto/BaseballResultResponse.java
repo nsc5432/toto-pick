@@ -16,7 +16,10 @@ public record BaseballResultResponse(
         Double res1,
         Double res2,
         String totalResult,
-        Double totalDiv) {
+        Double totalDiv,
+        Double homeDiv,
+        Double drawDiv,
+        Double awayDiv) {
 
     public static BaseballResultResponse from(BaseballResult baseballResult) {
         return new BaseballResultResponse(
@@ -33,6 +36,9 @@ public record BaseballResultResponse(
                 baseballResult.res1(),
                 baseballResult.res2(),
                 baseballResult.totalResult(),
-                baseballResult.totalDiv());
+                baseballResult.totalDiv(),
+                baseballResult.homeDiv(),
+                baseballResult.drawDiv(),
+                baseballResult.awayDiv());
     }
 }

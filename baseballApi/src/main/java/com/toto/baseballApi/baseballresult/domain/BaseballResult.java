@@ -14,5 +14,8 @@ public record BaseballResult(
         Double res1,
         Double res2,
         String totalResult,
-        Double totalDiv) {
+        Double totalDiv,
+        Double homeDiv,
+        Double drawDiv,
+        Double awayDiv) {
 }

@@ -73,7 +73,11 @@ public class WinRateOddsTwoWaySlipSelector implements TunableAlgorithm {
                 // family has on sample size. The validation window holds at most 628 fixtures, so
                 // how far a filter can be opened is the whole question of whether t can ever grow.
                 new ParamSpec(TeamRankSets.RANK_LIMIT, 3, 15, 3, TeamRankSets.DEFAULT_RANK_LIMIT),
-                new ParamSpec(AlgorithmParams.COMBINED_N, 2, 3, 1, 3));
+                // Floor 1, not 2 (설계 결정 D1, 2026-08-17 revision): a single-game 프로토 승부식
+                // purchase is possible, and parlay math (docs/statistical-model-design.md, D1) only
+                // ever costs excess return per added leg — N=1 halves the margin a real edge has to
+                // clear (−12.0% vs −22.5% no-skill), so it is the theoretical best case here.
+                new ParamSpec(AlgorithmParams.COMBINED_N, 1, 3, 1, 3));
     }
 
     @Override

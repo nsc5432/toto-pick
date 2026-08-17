@@ -58,11 +58,12 @@ public class FavoriteTwoWaySlipAlgorithm implements TunableAlgorithm {
     @Override
     public ParamSpace paramSpace() {
         return ParamSpace.of(
-                // 2~3 legs only (설계 결정 D1), matching FAVORITE so the two are comparable.
-                // The only knob this family has: selection is the market's own opinion, so there is
-                // nothing else here to tune. `oneRunHomeShare` used to sit alongside it, sizing the
-                // estimator that stood in for the missing 승패 price; the published price replaced it.
-                new ParamSpec(AlgorithmParams.COMBINED_N, 2, 3, 1, 3));
+                // 1~3 legs (설계 결정 D1, 2026-08-17 revision), matching FAVORITE so the two stay
+                // comparable. The only knob this family has: selection is the market's own opinion,
+                // so there is nothing else here to tune. `oneRunHomeShare` used to sit alongside it,
+                // sizing the estimator that stood in for the missing 승패 price; the published price
+                // replaced it.
+                new ParamSpec(AlgorithmParams.COMBINED_N, 1, 3, 1, 3));
     }
 
     @Override

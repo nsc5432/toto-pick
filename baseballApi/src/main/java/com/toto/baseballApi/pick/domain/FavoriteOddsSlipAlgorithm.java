@@ -38,9 +38,11 @@ public class FavoriteOddsSlipAlgorithm implements TunableAlgorithm {
 
     @Override
     public ParamSpace paramSpace() {
-        // 2~3 legs only (설계 결정 D1) — a baseline swept over leg counts the real candidates are
-        // barred from would not be the same comparison.
-        return ParamSpace.of(new ParamSpec(AlgorithmParams.COMBINED_N, 2, 3, 1, 3));
+        // 1~3 legs (설계 결정 D1, 2026-08-17 revision) — a baseline swept over leg counts the real
+        // candidates are barred from would not be the same comparison. N=1 was excluded until a
+        // single-game 프로토 승부식 purchase was confirmed possible; it is now the theoretical best
+        // case, since parlay math only ever costs excess return as legs are added.
+        return ParamSpace.of(new ParamSpec(AlgorithmParams.COMBINED_N, 1, 3, 1, 3));
     }
 
     @Override

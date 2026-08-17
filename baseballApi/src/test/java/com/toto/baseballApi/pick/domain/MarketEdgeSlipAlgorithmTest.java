@@ -98,12 +98,15 @@ class MarketEdgeSlipAlgorithmTest {
     }
 
     @Test
-    void combinedNStaysWithinTheTwoToThreeRangeOfDesignDecisionD1() {
+    void combinedNStaysWithinTheOneToThreeRangeOfDesignDecisionD1() {
+        // Floor moved from 2 to 1 on 2026-08-17 once a single-game 프로토 승부식 purchase was
+        // confirmed possible — the upper bound is still capped since 4+ legs need a per-leg edge
+        // that has never been demonstrated (설계 결정 D1).
         ParamSpec combinedN = algorithm.paramSpace().specs().stream()
                 .filter(spec -> AlgorithmParams.COMBINED_N.equals(spec.name()))
                 .findFirst().orElseThrow();
 
-        assertThat(combinedN.min()).isEqualTo(2);
+        assertThat(combinedN.min()).isEqualTo(1);
         assertThat(combinedN.max()).isEqualTo(3);
     }
 }

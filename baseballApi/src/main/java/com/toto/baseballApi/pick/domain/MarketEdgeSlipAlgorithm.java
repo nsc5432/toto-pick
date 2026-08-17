@@ -57,17 +57,18 @@ public class MarketEdgeSlipAlgorithm implements TunableAlgorithm {
     }
 
     /**
-     * Grid: 4 × 2 × 5 × 3 × 4 = 480 points, exhaustive under a 480+ budget.
+     * Grid: 4 × 3 × 5 × 3 × 4 = 720 points.
      *
      * <p>{@code combinedN} stops at 3 by 설계 결정 D1: each extra leg multiplies the margin the slip
      * has to overcome, so 4- and 5-leg slips need a per-leg edge that has never been demonstrated
-     * here. Sweeping them spends most of the budget on candidates that cannot clear the goal.
+     * here. Sweeping them spends most of the budget on candidates that cannot clear the goal. Floor
+     * moved to 1 (2026-08-17) once a single-game 프로토 승부식 purchase was confirmed possible.
      */
     @Override
     public ParamSpace paramSpace() {
         return ParamSpace.of(
                 new ParamSpec(AlgorithmParams.NUM, 10, 40, 10, 20),
-                new ParamSpec(AlgorithmParams.COMBINED_N, 2, 3, 1, 3),
+                new ParamSpec(AlgorithmParams.COMBINED_N, 1, 3, 1, 3),
                 new ParamSpec(EDGE_THRESHOLD, 0.02, 0.14, 0.03, 0.05),
                 new ParamSpec(MIN_ODDS, 1.4, 2.2, 0.4, 1.8),
                 // 0 = raw form; 45 pulls a 100-vs-0 pairing back to roughly 0.61.

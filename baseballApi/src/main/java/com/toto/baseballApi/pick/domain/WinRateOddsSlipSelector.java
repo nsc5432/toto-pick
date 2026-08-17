@@ -60,7 +60,10 @@ public class WinRateOddsSlipSelector implements TunableAlgorithm {
                 new ParamSpec(TeamRankSets.RANK_LIMIT, 3, 15, 3, TeamRankSets.DEFAULT_RANK_LIMIT),
                 // Legs per slip: more legs multiply the payout and shrink the hit rate — capped at
                 // 3 by 설계 결정 D1, since each extra leg raises the per-leg edge the goal demands.
-                new ParamSpec(AlgorithmParams.COMBINED_N, 2, 3, 1, 3));
+                // Floor moved to 1 (2026-08-17) once a single-game 프로토 승부식 purchase was
+                // confirmed possible — parlay math only ever costs excess return as legs are added,
+                // so N=1 is the theoretical best case and needs measuring, not assuming.
+                new ParamSpec(AlgorithmParams.COMBINED_N, 1, 3, 1, 3));
     }
 
     @Override

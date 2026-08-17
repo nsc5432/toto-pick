@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import com.toto.baseballApi.baseballresult.domain.BaseballResult;
+import com.toto.baseballApi.baseballresult.domain.FixtureKey;
 
 /**
  * Pairs each 3-way ("야구 승1패") row with the 2-way ("야구 승패") row for the same fixture.
@@ -25,9 +26,9 @@ import com.toto.baseballApi.baseballresult.domain.BaseballResult;
  */
 public final class MarketPairIndex {
 
-    private final Map<String, BaseballResult> twoWayByFixture;
+    private final Map<FixtureKey, BaseballResult> twoWayByFixture;
 
-    private MarketPairIndex(Map<String, BaseballResult> twoWayByFixture) {
+    private MarketPairIndex(Map<FixtureKey, BaseballResult> twoWayByFixture) {
         this.twoWayByFixture = twoWayByFixture;
     }
 
@@ -40,9 +41,9 @@ public final class MarketPairIndex {
         if (twoWayGames == null || twoWayGames.isEmpty()) {
             return empty();
         }
-        Map<String, BaseballResult> byFixture = new LinkedHashMap<>();
+        Map<FixtureKey, BaseballResult> byFixture = new LinkedHashMap<>();
         for (BaseballResult game : twoWayGames) {
-            byFixture.merge(fixtureKey(game), game,
+            byFixture.merge(FixtureKey.of(game), game,
                     (kept, candidate) -> kept.id() <= candidate.id() ? kept : candidate);
         }
         return new MarketPairIndex(Map.copyOf(byFixture));
@@ -54,17 +55,6 @@ public final class MarketPairIndex {
      * would be settling a bet against a row that does not exist.
      */
     public BaseballResult pairOf(BaseballResult game) {
-        return game == null ? null : twoWayByFixture.get(fixtureKey(game));
-    }
-
-    private static String fixtureKey(BaseballResult game) {
-        return String.join("|",
-                String.valueOf(game.year()),
-                String.valueOf(game.round()),
-                game.tournament(),
-                game.ymd(),
-                game.tm(),
-                game.home(),
-                game.away());
+        return game == null ? null : twoWayByFixture.get(FixtureKey.of(game));
     }
 }

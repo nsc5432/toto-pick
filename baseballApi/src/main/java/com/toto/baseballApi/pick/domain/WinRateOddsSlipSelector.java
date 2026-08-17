@@ -2,10 +2,8 @@ package com.toto.baseballApi.pick.domain;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import com.toto.baseballApi.baseballresult.domain.BaseballResult;
@@ -36,7 +34,6 @@ public class WinRateOddsSlipSelector implements TunableAlgorithm {
     private static final String MLB = "MLB";
     private static final String HOME_WIN = "승";
     private static final String AWAY_WIN = "패";
-    private static final int RANK_LIMIT = 5;
 
     @Override
     public String code() {
@@ -54,9 +51,13 @@ public class WinRateOddsSlipSelector implements TunableAlgorithm {
                 // Window length: short enough to track form, long enough not to be one hot streak.
                 new ParamSpec(AlgorithmParams.NUM, 5, 40, 5, 20),
                 // Back a strong team only while the market still pays at least x for it.
-                new ParamSpec(AlgorithmParams.X, 1.4, 3.0, 0.1, 1.8),
+                new ParamSpec(AlgorithmParams.X, 1.2, 3.0, 0.2, 1.8),
                 // Fade a weak team only while the market prices it at or under y.
-                new ParamSpec(AlgorithmParams.Y, 1.4, 3.0, 0.1, 2.5),
+                new ParamSpec(AlgorithmParams.Y, 1.4, 5.0, 0.2, 2.4),
+                // How many DENSE_RANK positions count as top/bottom. Was a hard-coded 5 — the one
+                // threshold in this family that was never swept, and the strongest lever on sample
+                // size, since it decides how many teams can produce a candidate at all.
+                new ParamSpec(TeamRankSets.RANK_LIMIT, 3, 15, 3, TeamRankSets.DEFAULT_RANK_LIMIT),
                 // Legs per slip: more legs multiply the payout and shrink the hit rate — capped at
                 // 3 by 설계 결정 D1, since each extra leg raises the per-leg edge the goal demands.
                 new ParamSpec(AlgorithmParams.COMBINED_N, 2, 3, 1, 3));
@@ -64,7 +65,8 @@ public class WinRateOddsSlipSelector implements TunableAlgorithm {
 
     @Override
     public List<PickSlip> selectSlips(SlipSelectionInput input) {
-        TeamRankSets rankSets = rankTeams(input.formIndex(), input.ymd(), input.num());
+        TeamRankSets rankSets = TeamRankSets.of(input.formIndex(), input.ymd(), input.num(),
+                input.params().getInt(TeamRankSets.RANK_LIMIT, (int) TeamRankSets.DEFAULT_RANK_LIMIT));
 
         List<Candidate> mlbCandidates = new ArrayList<>();
         List<Candidate> kboNpbCandidates = new ArrayList<>();
@@ -82,33 +84,7 @@ public class WinRateOddsSlipSelector implements TunableAlgorithm {
         return slips;
     }
 
-    private record TeamRankSets(Set<String> top, Set<String> bottom) {
-    }
-
     private record Candidate(Integer resultId, String predictedTotalResult, double odds) {
-    }
-
-    private TeamRankSets rankTeams(TeamFormIndex formIndex, String ymd, int num) {
-        Map<String, Long> percentByTeam = formIndex.winPercents(ymd, num);
-
-        List<Long> distinctDesc = percentByTeam.values().stream().distinct()
-                .sorted(Comparator.reverseOrder())
-                .toList();
-        Set<Long> topPercents = new HashSet<>(distinctDesc.subList(0, Math.min(RANK_LIMIT, distinctDesc.size())));
-        Set<Long> bottomPercents = new HashSet<>(
-                distinctDesc.subList(Math.max(0, distinctDesc.size() - RANK_LIMIT), distinctDesc.size()));
-
-        Set<String> top = new HashSet<>();
-        Set<String> bottom = new HashSet<>();
-        percentByTeam.forEach((team, percent) -> {
-            if (topPercents.contains(percent)) {
-                top.add(team);
-            }
-            if (bottomPercents.contains(percent)) {
-                bottom.add(team);
-            }
-        });
-        return new TeamRankSets(top, bottom);
     }
 
     private Candidate toCandidate(BaseballResult game, TeamRankSets rankSets, double x, double y) {

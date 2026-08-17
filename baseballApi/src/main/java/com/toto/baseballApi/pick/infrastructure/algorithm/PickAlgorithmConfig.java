@@ -10,6 +10,7 @@ import com.toto.baseballApi.pick.domain.FavoriteTwoWaySlipAlgorithm;
 import com.toto.baseballApi.pick.domain.MarketEdgeSlipAlgorithm;
 import com.toto.baseballApi.pick.domain.PickAlgorithm;
 import com.toto.baseballApi.pick.domain.WinRateOddsSlipSelector;
+import com.toto.baseballApi.pick.domain.WinRateOddsTwoWaySlipSelector;
 
 /**
  * Registers pure-logic {@link PickAlgorithm} implementations from the domain package as beans,
@@ -48,5 +49,10 @@ class PickAlgorithmConfig {
     @Bean
     PickAlgorithm favoriteTwoWayMartingaleAlgorithm() {
         return new FavoriteTwoWayMartingaleAlgorithm();
+    }
+
+    @Bean
+    PickAlgorithm winRateOddsTwoWayAlgorithm() {
+        return new WinRateOddsTwoWaySlipSelector();
     }
 }

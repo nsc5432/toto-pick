@@ -7,6 +7,7 @@ import java.util.Map;
 
 import com.toto.baseballApi.baseballresult.domain.BaseballResult;
 import com.toto.baseballApi.baseballresult.domain.ThreeWayOdds;
+import com.toto.baseballApi.baseballresult.domain.TwoWayOdds;
 
 /**
  * Settlement math shared by manual settlement and simulation — kept in one place so payouts never
@@ -18,9 +19,9 @@ import com.toto.baseballApi.baseballresult.domain.ThreeWayOdds;
  * {@code publishedOdds()}) and settlement quote the same market.
  *
  * <p>Everything except {@link #settle} needs the <em>pre-game</em> price of the backed side, which is
- * a different question from what the winner paid. It normally comes from the game's own
- * {@code publishedOdds()}; a leg may instead carry its own {@link BackedPrice} for rows that have no
- * published quote — see {@link #priceOf}.
+ * a different question from what the winner paid. It normally comes from the row's own published
+ * quote — 3-way or 2-way, whichever market the row is in; a leg may instead carry its own
+ * {@link BackedPrice} when the algorithm priced it some other way — see {@link #priceOf}.
  */
 public final class PickSettlement {
 
@@ -82,7 +83,7 @@ public final class PickSettlement {
      * lower both the return and the benchmark together.
      *
      * <p>Because {@code O} is the margin of whichever market the leg was quoted in, a 승패 leg is
-     * measured against the 2-way margin (≈13.6%) and a 승1패 leg against the 3-way one (≈15.2%) —
+     * measured against the 2-way margin (≈14.1%) and a 승1패 leg against the 3-way one (≈15.2%) —
      * which is the point: switching to a cheaper market is a real gain and has to show up as one.
      *
      * <p>{@code null} when any leg has no price, since a benchmark cannot be quoted for a price that
@@ -139,13 +140,17 @@ public final class PickSettlement {
     }
 
     /**
-     * The pre-game price of this leg's backed side: whatever the algorithm attached, else the game's
-     * own published 3-way quote. {@code null} means "no price" — the caller skips the leg or the day.
+     * The pre-game price of this leg's backed side: whatever the algorithm attached, else the row's
+     * own published quote. {@code null} means "no price" — the caller skips the leg or the day.
      *
-     * <p>The override exists because 2-way ("야구 승패") rows carry no {@code PUB_*} columns at all,
-     * so an algorithm betting that market prices its legs from the paired 3-way quote. Falling back
-     * to the row's own {@code totalDiv} instead would reintroduce 설계 결정 D2 exactly: only the
-     * realized side is measured there, so the price would partly encode the outcome.
+     * <p>Which quote a row has depends on its market: a 3-way row (승1패) fills all three
+     * {@code PUB_*} columns, a 2-way one (승패, 핸디캡, 언더오버, SUM) fills two and leaves the middle
+     * null. Both are read here, so a leg is priced correctly whichever market it sits in and an
+     * algorithm only needs to attach a {@link BackedPrice} when it prices legs some other way.
+     *
+     * <p>What is never a fallback is the row's own {@code totalDiv}: only the realized side is
+     * measured there, so using it as a pre-game price would partly encode the outcome — 설계 결정 D2
+     * exactly. A missing price is a skipped leg, not a guessed one.
      */
     private static BackedPrice priceOf(
             PickDetail detail, Map<Integer, BaseballResult> gamesById,
@@ -158,10 +163,15 @@ public final class PickSettlement {
         if (supplied != null) {
             return supplied;
         }
-        ThreeWayOdds odds = game.publishedOdds();
-        return odds == null
+        ThreeWayOdds threeWay = game.publishedOdds();
+        if (threeWay != null) {
+            return new BackedPrice(
+                    backedOdds(threeWay, detail.totalResult()), threeWay.overround());
+        }
+        TwoWayOdds twoWay = game.publishedTwoWayOdds();
+        return twoWay == null
                 ? null
-                : new BackedPrice(backedOdds(odds, detail.totalResult()), odds.overround());
+                : new BackedPrice(backedOdds(twoWay, detail.totalResult()), twoWay.overround());
     }
 
     private static double backedOdds(ThreeWayOdds odds, String predicted) {
@@ -169,6 +179,19 @@ public final class PickSettlement {
             case "승" -> odds.home();
             case "1" -> odds.draw();
             case "패" -> odds.away();
+            default -> throw new IllegalArgumentException("Unknown predicted result: " + predicted);
+        };
+    }
+
+    /**
+     * The 2-way markets share one price pair but not one vocabulary: 승패/핸디캡 settle 승/패,
+     * 언더오버 settles 언더/오버, SUM settles 홀/짝. All three name the home-side price first, which is
+     * the order the columns are in.
+     */
+    private static double backedOdds(TwoWayOdds odds, String predicted) {
+        return switch (predicted) {
+            case "승", "언더", "홀" -> odds.home();
+            case "패", "오버", "짝" -> odds.away();
             default -> throw new IllegalArgumentException("Unknown predicted result: " + predicted);
         };
     }

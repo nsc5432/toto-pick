@@ -216,18 +216,33 @@ public class ForwardPickService {
                 ForwardPickStatus.PENDING, null, LocalDateTime.now(), null, legs);
     }
 
+    /**
+     * The fixture's own published price for the backed side — the fallback for an algorithm that did
+     * not attach one. Reads whichever market the listing is in, since a 3-way row publishes all three
+     * slots and a 2-way row only two.
+     */
     private static BackedPrice publishedPrice(MatchSchedule fixture, String predicted) {
-        var odds = fixture.asFixture().publishedOdds();
-        if (odds == null) {
+        BaseballResult listing = fixture.asFixture();
+        var threeWay = listing.publishedOdds();
+        if (threeWay != null) {
+            double backed = switch (predicted) {
+                case "승" -> threeWay.home();
+                case "1" -> threeWay.draw();
+                case "패" -> threeWay.away();
+                default -> throw new IllegalArgumentException("Unknown predicted result: " + predicted);
+            };
+            return new BackedPrice(backed, threeWay.overround());
+        }
+        var twoWay = listing.publishedTwoWayOdds();
+        if (twoWay == null) {
             return null;
         }
         double backed = switch (predicted) {
-            case "승" -> odds.home();
-            case "1" -> odds.draw();
-            case "패" -> odds.away();
+            case "승", "언더", "홀" -> twoWay.home();
+            case "패", "오버", "짝" -> twoWay.away();
             default -> throw new IllegalArgumentException("Unknown predicted result: " + predicted);
         };
-        return new BackedPrice(backed, odds.overround());
+        return new BackedPrice(backed, twoWay.overround());
     }
 
     /**

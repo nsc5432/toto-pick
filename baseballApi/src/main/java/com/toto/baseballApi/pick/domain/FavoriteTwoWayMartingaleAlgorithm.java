@@ -3,8 +3,6 @@ package com.toto.baseballApi.pick.domain;
 import java.math.BigDecimal;
 import java.util.List;
 
-import com.toto.baseballApi.baseballresult.domain.TwoWayOddsEstimator;
-
 /**
  * {@link FavoriteTwoWaySlipAlgorithm} selection under martingale staking — the 승패-market sibling of
  * {@link FavoriteMartingaleAlgorithm}, and the reason the 2-way plumbing exists.
@@ -18,20 +16,20 @@ import com.toto.baseballApi.baseballresult.domain.TwoWayOddsEstimator;
  * other. Hits get roughly twice as common — a 2-leg slip converts near 0.35 instead of 0.20, because
  * a one-run win is no longer a loss. But the combined odds fall with it (about 2.3 rather than 3.0),
  * and the martingale's step multiplier is {@code O/(O−1)}, so each miss escalates the stake faster:
- * the 50,000원 budget covers about 7 steps here against 10 there. The net is still a clear win on the
- * risk axis — a sequence busts around 6% of the time instead of 11% — which is the point of the
- * change, since that is the only outcome the staking layer can actually influence.
+ * the 50,000원 budget covers about 7 steps here against 10 there. Measured, the two effects roughly
+ * cancel on drawdown and the observed maxDrawdown came out <em>worse</em>, not better
+ * (docs/martingale-staking-design.md §10) — the prediction that it would fall was wrong, and it is
+ * recorded here so the next reader does not re-derive it.
  *
  * <p><strong>What it does not do.</strong> It does not make the strategy profitable. The 2-way margin
- * (13.6%) is lower than the 3-way one (15.2%), so the bleed per leg improves from −13.2% to −12.0%,
+ * (14.1%) is lower than the 3-way one (15.2%), so the bleed per leg improves from −13.2% to −12.4%,
  * but it stays negative and no staking rule can change that sign
  * (docs/martingale-staking-design.md §8). Judge this the same way as everything else: on excess
  * return against the market benchmark, with hit rate and budget-exhaustion rate read as diagnostics.
  *
- * <p>Stakes are sized off the estimated 2-way price, not a published one, because the 승패 rows carry
- * no published quote. A biased estimate therefore shows up as "hit the slip, missed the target"
- * rather than as an obvious failure — validate the estimator against realized {@code TOTAL_DIV}
- * before trusting any number computed on top of it.
+ * <p>Stakes are sized off the 승패 row's own published price. They used to be sized off an estimate of
+ * it, which mattered here more than anywhere else: the stake is a function of the price, so a biased
+ * price shows up as "hit the slip, missed the target" rather than as an obvious failure.
  */
 public class FavoriteTwoWayMartingaleAlgorithm implements StakingAlgorithm, TunableAlgorithm {
 
@@ -59,8 +57,6 @@ public class FavoriteTwoWayMartingaleAlgorithm implements StakingAlgorithm, Tuna
     public ParamSpace paramSpace() {
         return ParamSpace.of(
                 new ParamSpec(TARGET_PROFIT, 500, 5000, 500, DEFAULT_TARGET_PROFIT),
-                new ParamSpec(FavoriteTwoWaySlipAlgorithm.ONE_RUN_HOME_SHARE, 0.40, 0.80, 0.05,
-                        TwoWayOddsEstimator.DEFAULT_ONE_RUN_HOME_SHARE),
                 // Pinned, not swept: "2게임 조합" is the premise of this strategy, and declaring it
                 // keeps the persisted simulation (which runs with empty params) at the same value.
                 ParamSpec.fixed(AlgorithmParams.COMBINED_N, MARTINGALE_COMBINED_N));

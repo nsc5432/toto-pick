@@ -9,9 +9,7 @@ import java.util.Map;
 import java.util.Set;
 
 import com.toto.baseballApi.baseballresult.domain.BaseballResult;
-import com.toto.baseballApi.baseballresult.domain.ThreeWayOdds;
 import com.toto.baseballApi.baseballresult.domain.TwoWayOdds;
-import com.toto.baseballApi.baseballresult.domain.TwoWayOddsEstimator;
 
 /**
  * {@link WinRateOddsSlipSelector} moved to the 2-way ("야구 승패") market.
@@ -31,18 +29,19 @@ import com.toto.baseballApi.baseballresult.domain.TwoWayOddsEstimator;
  * with two separately-motivated reasons to be positive.
  *
  * <p><strong>{@code x} and {@code y} do not mean here what they mean there.</strong> Both are odds
- * thresholds, and 2-way prices are systematically shorter than 3-way ones — measured over the 2,611
- * published games, the 5th–95th percentile band moves from 1.78–3.65 down to 1.38–2.19. Reusing the
- * 3-way sweep range would put every threshold outside the data, so the range is shifted to match the
- * distribution rather than the parameter name. This is the reason the thresholds read the estimated
- * 2-way price and not the 3-way one: the question the rule asks is whether the price being taken is
- * long enough, and the price being taken is the 2-way one.
+ * thresholds, and 2-way prices are systematically shorter than 3-way ones — measured over the
+ * published games, the 5th–95th percentile band moves from 1.78–3.65 down to about 1.38–2.19. Reusing
+ * the 3-way sweep range would put every threshold outside the data, so the range is shifted to match
+ * the distribution rather than the parameter name. This is also why the thresholds read the 2-way
+ * price and not the 3-way one: the question the rule asks is whether the price being taken is long
+ * enough, and the price being taken is the 2-way one.
  *
  * <p>Pricing, pairing, and settlement work exactly as in {@link FavoriteTwoWaySlipAlgorithm}: the
- * signal comes from the paired 3-way row's published odds (the 승패 row has no {@code PUB_*}), the leg
- * carries its estimated {@link BackedPrice}, and the pick points at the 승패 row so settlement pays
- * that market's {@code TOTAL_DIV}. The 승패 row's own {@code TOTAL_DIV} is never a signal — only its
- * realized side is measured, which is 설계 결정 D2.
+ * price is the 승패 row's own published quote, the leg carries it as its {@link BackedPrice}, and the
+ * pick points at that row so settlement pays that market's {@code TOTAL_DIV}. The row's own
+ * {@code TOTAL_DIV} is never a signal — only its realized side is measured, which is 설계 결정 D2.
+ * Form, by contrast, still comes from {@code input.formIndex()} and therefore from finished games
+ * strictly before {@code ymd}.
  */
 public class WinRateOddsTwoWaySlipSelector implements TunableAlgorithm {
 
@@ -74,31 +73,20 @@ public class WinRateOddsTwoWaySlipSelector implements TunableAlgorithm {
                 // family has on sample size. The validation window holds at most 628 fixtures, so
                 // how far a filter can be opened is the whole question of whether t can ever grow.
                 new ParamSpec(TeamRankSets.RANK_LIMIT, 3, 15, 3, TeamRankSets.DEFAULT_RANK_LIMIT),
-                new ParamSpec(AlgorithmParams.COMBINED_N, 2, 3, 1, 3),
-                // Deliberately narrower than FAVORITE_2WAY's 0.40–0.80. This family already spends
-                // its grid on num/x/y, and the share is not a strategy threshold — it is a price
-                // model parameter with independent evidence: mean price error against published 승패
-                // odds is 1.60% at 0.60 and rises steeply either side (2.70% / 3.17%). Sweeping it
-                // across nine points here would multiply the grid by 9 against the 3-way version it
-                // must be compared with, buying sparser coverage of the knobs that matter.
-                new ParamSpec(FavoriteTwoWaySlipAlgorithm.ONE_RUN_HOME_SHARE, 0.55, 0.65, 0.05,
-                        TwoWayOddsEstimator.DEFAULT_ONE_RUN_HOME_SHARE));
+                new ParamSpec(AlgorithmParams.COMBINED_N, 2, 3, 1, 3));
     }
 
     @Override
     public List<PickSlip> selectSlips(SlipSelectionInput input) {
         TeamRankSets rankSets = TeamRankSets.of(input.formIndex(), input.ymd(), input.num(),
                 input.params().getInt(TeamRankSets.RANK_LIMIT, (int) TeamRankSets.DEFAULT_RANK_LIMIT));
-        double oneRunHomeShare = input.params().get(
-                FavoriteTwoWaySlipAlgorithm.ONE_RUN_HOME_SHARE,
-                TwoWayOddsEstimator.DEFAULT_ONE_RUN_HOME_SHARE);
 
         // Grouped by 조합버킷: a 프로토 구매권 cannot mix time slots, so MLB (Korean morning) and
         // KBO+NPB (evening) never share a slip.
         Map<String, List<Candidate>> byBucket = new LinkedHashMap<>();
         for (BaseballResult game : input.dayGames()) {
             Candidate candidate = toCandidate(
-                    game, input.marketPairs(), rankSets, input.x(), input.y(), oneRunHomeShare);
+                    game, input.marketPairs(), rankSets, input.x(), input.y());
             if (candidate == null) {
                 continue;
             }
@@ -119,16 +107,12 @@ public class WinRateOddsTwoWaySlipSelector implements TunableAlgorithm {
 
     private Candidate toCandidate(
             BaseballResult game, MarketPairIndex marketPairs, TeamRankSets rankSets,
-            double x, double y, double oneRunHomeShare) {
-        ThreeWayOdds published = game.publishedOdds();
-        if (published == null) {
-            return null;
-        }
+            double x, double y) {
         BaseballResult twoWayGame = marketPairs.pairOf(game);
         if (twoWayGame == null) {
             return null;
         }
-        TwoWayOdds odds = TwoWayOddsEstimator.from(published, oneRunHomeShare);
+        TwoWayOdds odds = twoWayGame.publishedTwoWayOdds();
         if (odds == null) {
             return null;
         }

@@ -3,11 +3,16 @@ package com.toto.baseballApi.pick.domain;
 /**
  * The pre-game price of the one side a leg backs, plus the margin of the market it was quoted in.
  *
- * <p>Normally settlement reads this straight off {@code BaseballResult.publishedOdds()}, and an
- * algorithm has no reason to supply it. It exists for the case where the row being settled carries no
- * published quote of its own: the 2-way ("야구 승패") rows have no {@code PUB_*} columns, so an
- * algorithm betting that market derives the price from the same fixture's published 3-way quote (see
- * {@code TwoWayOddsEstimator}) and hands the result down with the selection.
+ * <p>Settlement can normally read this straight off the row's own published quote, so most algorithms
+ * have no reason to supply it. Attaching it is how an algorithm says "this is the price I actually
+ * took", which matters whenever selection and settlement look at different rows: a 승패 algorithm
+ * selects over the 승1패 day universe and points its legs at the paired 승패 row, and carrying the price
+ * down with the selection is what guarantees the number that sized the stake is the number the
+ * benchmark uses.
+ *
+ * <p>It was originally load-bearing rather than a convenience: 승패 rows had no {@code PUB_*} at all
+ * and their price had to be derived from the 3-way quote. Published 2-way prices now exist, so this
+ * carries a real quote instead of an estimate.
  *
  * <p>{@code overround} follows the same convention as {@code ThreeWayOdds.overround()} — the inverse
  * sum <em>minus one</em>, i.e. the margin — because {@code PickSettlement.marketExpectation} divides

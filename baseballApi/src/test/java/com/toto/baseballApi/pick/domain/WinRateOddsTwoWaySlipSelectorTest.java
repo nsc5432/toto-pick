@@ -34,10 +34,11 @@ class WinRateOddsTwoWaySlipSelectorTest {
                 pubHome, pubDraw, pubAway);
     }
 
-    private BaseballResult twoWay(int id, String home, String away) {
+    /** The 승패 listing, carrying the price this algorithm actually reads and bets at. */
+    private BaseballResult twoWay(int id, String home, String away, Double pubHome, Double pubAway) {
         return new BaseballResult(id, 2026, 76, "KBO", "260630", "18:30", home, away,
                 "야구 승패", null, 0.0, null, "승", 1.6,
-                null, null, null);
+                pubHome, null, pubAway);
     }
 
     /**
@@ -99,27 +100,35 @@ class WinRateOddsTwoWaySlipSelectorTest {
 
     @Test
     void backsATopFormTeamThatIsStillPricedAboveX() {
-        // 3-way 2.40/3.30/2.60 → 2-way home ≈ 1.62, comfortably above x = 1.40.
         List<BaseballResult> threeWayGames = List.of(threeWay(1, STRONG, MID, 2.40, 3.30, 2.60));
-        List<BaseballResult> twoWayGames = List.of(twoWay(101, STRONG, MID));
+        // 승패 home 1.65, comfortably above x = 1.40.
+        List<BaseballResult> twoWayGames = List.of(twoWay(101, STRONG, MID, 1.65, 1.89));
 
         List<PickSelection> legs =
                 allSelections(algorithm.selectSlips(input(1, threeWayGames, twoWayGames)));
 
         assertThat(legs).hasSize(1);
-        // Points at the 승패 row, not the 승1패 row it read the signal from.
+        // Points at the 승패 row, which is both where the price came from and where it settles.
         assertThat(legs.get(0).resultId()).isEqualTo(101);
         assertThat(legs.get(0).predictedTotalResult()).isEqualTo("승");
-        // Carries the estimated 2-way price, since the 승패 row has none of its own.
-        assertThat(legs.get(0).price()).isNotNull();
-        assertThat(legs.get(0).price().odds()).isBetween(1.4, 2.0);
+        assertThat(legs.get(0).price().odds()).isEqualTo(1.65);
+    }
+
+    @Test
+    void comparesTheThresholdAgainstTheTwoWayPriceNotTheThreeWayOne() {
+        // The distinction is not academic: 2.40 on the 3-way side clears x = 1.40 easily, while the
+        // same fixture's 승패 price of 1.30 does not. The rule must ask about the price it is taking.
+        List<BaseballResult> threeWayGames = List.of(threeWay(1, STRONG, MID, 2.40, 3.30, 2.60));
+        List<BaseballResult> twoWayGames = List.of(twoWay(101, STRONG, MID, 1.30, 4.20));
+
+        assertThat(algorithm.selectSlips(input(1, threeWayGames, twoWayGames))).isEmpty();
     }
 
     @Test
     void fadesABottomFormTeamThatThePriceOvervalues() {
-        // WEAK is short (3-way 1.50 → 2-way ≈ 1.21 ≤ y), so back its opponent.
+        // WEAK is priced at 1.43 ≤ y, so back its opponent.
         List<BaseballResult> threeWayGames = List.of(threeWay(1, WEAK, MID, 1.50, 3.60, 5.00));
-        List<BaseballResult> twoWayGames = List.of(twoWay(101, WEAK, MID));
+        List<BaseballResult> twoWayGames = List.of(twoWay(101, WEAK, MID, 1.43, 2.29));
 
         List<PickSelection> legs =
                 allSelections(algorithm.selectSlips(input(1, threeWayGames, twoWayGames)));
@@ -127,14 +136,16 @@ class WinRateOddsTwoWaySlipSelectorTest {
         assertThat(legs).hasSize(1);
         assertThat(legs.get(0).resultId()).isEqualTo(101);
         assertThat(legs.get(0).predictedTotalResult()).isEqualTo("패");
+        // Backing the away side means taking the away price, not the one that triggered the signal.
+        assertThat(legs.get(0).price().odds()).isEqualTo(2.29);
     }
 
     @Test
     void skipsATopFormTeamThatIsAlreadyTooShort() {
-        // 3-way 1.40 → 2-way ≈ 1.16, under x — no value left in backing the strong side, and MID
-        // is in neither set, so nothing else fires either.
+        // 1.30 is under x — no value left in backing the strong side, and MID is in neither set, so
+        // nothing else fires either.
         List<BaseballResult> threeWayGames = List.of(threeWay(1, STRONG, MID, 1.40, 3.80, 6.00));
-        List<BaseballResult> twoWayGames = List.of(twoWay(101, STRONG, MID));
+        List<BaseballResult> twoWayGames = List.of(twoWay(101, STRONG, MID, 1.30, 4.20));
 
         assertThat(algorithm.selectSlips(input(1, threeWayGames, twoWayGames))).isEmpty();
     }
@@ -144,7 +155,7 @@ class WinRateOddsTwoWaySlipSelectorTest {
         // Both teams are top-ranked and both sides clear x, so the rule wants to back both — which
         // is no information at all.
         List<BaseballResult> threeWayGames = List.of(threeWay(1, STRONG, STRONG2, 2.40, 3.30, 2.60));
-        List<BaseballResult> twoWayGames = List.of(twoWay(101, STRONG, STRONG2));
+        List<BaseballResult> twoWayGames = List.of(twoWay(101, STRONG, STRONG2, 1.65, 1.89));
 
         assertThat(algorithm.selectSlips(input(1, threeWayGames, twoWayGames))).isEmpty();
     }
@@ -152,9 +163,11 @@ class WinRateOddsTwoWaySlipSelectorTest {
     @Test
     void skipsGamesWithNoPublishedPriceOrNoTwoWayCounterpart() {
         List<BaseballResult> threeWayGames = List.of(
-                threeWay(1, STRONG, MID, null, null, null),      // no published price
-                threeWay(2, STRONG, MID, 2.40, 3.30, 2.60));     // no 승패 listing
-        assertThat(algorithm.selectSlips(input(1, threeWayGames, List.of()))).isEmpty();
+                threeWay(1, STRONG, MID, 2.40, 3.30, 2.60),      // 승패 listed but unpriced
+                threeWay(2, STRONG, MID, 2.40, 3.30, 2.60));     // no 승패 listing at all
+        List<BaseballResult> twoWayGames = List.of(twoWay(101, STRONG, MID, null, null));
+
+        assertThat(algorithm.selectSlips(input(1, threeWayGames, twoWayGames))).isEmpty();
     }
 
     @Test
@@ -165,10 +178,10 @@ class WinRateOddsTwoWaySlipSelectorTest {
                         "야구 승1패", null, 0.0, null, "승", 2.0,
                         2.40, 3.30, 2.60));
         List<BaseballResult> twoWayGames = List.of(
-                twoWay(101, STRONG, MID),
+                twoWay(101, STRONG, MID, 1.65, 1.89),
                 new BaseballResult(102, 2026, 76, "MLB", "260630", "08:30", STRONG, MID,
                         "야구 승패", null, 0.0, null, "승", 1.6,
-                        null, null, null));
+                        1.65, null, 1.89));
 
         // One candidate per bucket, so a 2-leg slip cannot be formed in either.
         assertThat(algorithm.selectSlips(input(2, threeWayGames, twoWayGames))).isEmpty();
@@ -180,8 +193,7 @@ class WinRateOddsTwoWaySlipSelectorTest {
         assertThat(algorithm.paramSpace().specs()).extracting(ParamSpec::name)
                 .containsExactlyInAnyOrder(
                         AlgorithmParams.NUM, AlgorithmParams.X, AlgorithmParams.Y,
-                        AlgorithmParams.COMBINED_N, TeamRankSets.RANK_LIMIT,
-                        FavoriteTwoWaySlipAlgorithm.ONE_RUN_HOME_SHARE);
+                        AlgorithmParams.COMBINED_N, TeamRankSets.RANK_LIMIT);
     }
 
     @Test

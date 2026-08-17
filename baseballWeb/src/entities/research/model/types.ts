@@ -30,6 +30,11 @@ export interface BacktestWindow {
   endYmd: string;
 }
 
+/**
+ * 한 구간의 성적. **판정은 `legExcessReturn`으로 한다** — `profitRate`는 "돈을 벌었나"를 묻고,
+ * 마진 15%대 시장에서 그 답은 거의 항상 '아니오'이며 전략이 무엇을 알았는지는 말해주지 않는다.
+ * 레그 단위인 이유는 조합 단위 수치가 묶는 방식만 바꿔도 부호가 뒤집힐 만큼 노이즈가 크기 때문이다.
+ */
 export interface BacktestMetrics {
   dayCount: number;
   bettingDayCount: number;
@@ -41,6 +46,16 @@ export interface BacktestMetrics {
   hitRate: number | null;
   maxDrawdown: number;
   worstLosingStreak: number;
+  segmentCount: number;
+  profitableSegmentCount: number;
+  benchmarkOutputTotal: number | null;
+  excessReturn: number | null;
+  legCount: number;
+  legHitCount: number;
+  legReturnRate: number | null;
+  legBenchmarkRate: number | null;
+  legExcessReturn: number | null;
+  legExcessTStat: number | null;
 }
 
 export interface GoalCheck {

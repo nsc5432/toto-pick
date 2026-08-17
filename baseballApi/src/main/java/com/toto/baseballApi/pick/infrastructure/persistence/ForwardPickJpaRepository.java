@@ -11,4 +11,6 @@ interface ForwardPickJpaRepository extends JpaRepository<ForwardPickJpaEntity, I
 
     List<ForwardPickJpaEntity> findByAlgorithmCodeAndUserNameOrderByYmdAscIdAsc(
             String algorithmCode, String userName);
+
+    List<ForwardPickJpaEntity> findAllByOrderByYmdAscIdAsc();
 }

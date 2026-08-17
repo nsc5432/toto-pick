@@ -10,9 +10,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.toto.baseballApi.research.application.AlgorithmSearchService;
+import com.toto.baseballApi.research.application.ForwardReportService;
 import com.toto.baseballApi.research.presentation.dto.AlgorithmSpaceResponse;
 import com.toto.baseballApi.research.presentation.dto.BacktestRequest;
 import com.toto.baseballApi.research.presentation.dto.ExperimentResponse;
+import com.toto.baseballApi.research.presentation.dto.ForwardReportResponse;
 import com.toto.baseballApi.research.presentation.dto.GoalResponse;
 import com.toto.baseballApi.research.presentation.dto.SearchRequest;
 import com.toto.baseballApi.research.presentation.dto.SearchResponse;
@@ -36,6 +38,7 @@ import lombok.RequiredArgsConstructor;
 public class ResearchController {
 
     private final AlgorithmSearchService searchService;
+    private final ForwardReportService forwardReportService;
 
     @GetMapping("/goal")
     public GoalResponse goal() {
@@ -64,6 +67,21 @@ public class ResearchController {
     public List<ExperimentResponse> leaderboard(@RequestParam(defaultValue = "20") int limit) {
         return searchService.leaderboard(limit).stream()
                 .map(ExperimentResponse::from)
+                .toList();
+    }
+
+    /**
+     * The forward test's standing — cumulative, and judged by the same {@code research.goal} a sweep
+     * is. One entry per frozen candidate on record.
+     *
+     * <p>This is the only measurement here that is not in-sample, so it is the only one whose verdict
+     * means what it says. Expect it to fail the sample gates for weeks: about ten legs accumulate a
+     * day, and that is the price of a number that cannot be a window effect.
+     */
+    @GetMapping("/forward-report")
+    public List<ForwardReportResponse> forwardReport() {
+        return forwardReportService.reports().stream()
+                .map(ForwardReportResponse::from)
                 .toList();
     }
 

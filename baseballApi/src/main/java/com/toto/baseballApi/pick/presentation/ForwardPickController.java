@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.toto.baseballApi.matchschedule.domain.MatchScheduleRepository;
 import com.toto.baseballApi.pick.application.ForwardPickService;
 import com.toto.baseballApi.pick.application.ForwardPickSettlementService;
+import com.toto.baseballApi.pick.presentation.dto.ForwardPickListResponse;
 import com.toto.baseballApi.pick.presentation.dto.ForwardPickResponse;
 import com.toto.baseballApi.pick.presentation.dto.ForwardSettlementResponse;
 import com.toto.baseballApi.pick.presentation.dto.GenerateForwardPicksRequest;
@@ -40,6 +41,25 @@ public class ForwardPickController {
     @GetMapping("/schedule-dates")
     public List<String> scheduleDates() {
         return matchScheduleRepository.findDistinctYmds();
+    }
+
+    /**
+     * The picks on record, newest day first. Read-only and unfiltered by design — the whole record is
+     * the evidence, and there is only ever a handful of slips a day.
+     *
+     * <p>Cumulative metrics and the goal verdict deliberately live elsewhere
+     * ({@code GET /api/research/forward-report}): recording picks is this feature's job, judging them
+     * is {@code research}'s.
+     */
+    @GetMapping
+    public List<ForwardPickListResponse> picks(
+            @RequestParam(required = false) String algorithmCode,
+            @RequestParam(required = false) String userName,
+            @RequestParam(required = false) String status) {
+        return forwardPickService.picks(algorithmCode, userName, status).stream()
+                .map(pick -> ForwardPickListResponse.from(
+                        pick, forwardPickService.algorithmName(pick.algorithmCode())))
+                .toList();
     }
 
     @PostMapping("/generate")

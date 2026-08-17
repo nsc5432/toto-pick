@@ -18,6 +18,13 @@ public interface ForwardPickRepository {
     /** Every pick for one algorithm, chronologically — the order a staking session must be replayed in. */
     List<ForwardPick> findByAlgorithm(String algorithmCode, String userName);
 
+    /**
+     * Every pick on record, chronologically. Unpaginated on purpose: the forward test accumulates a
+     * handful of slips a day by construction, and the report has to see all of them — a cumulative
+     * edge measured over a page is not a cumulative edge.
+     */
+    List<ForwardPick> findAll();
+
     /** Writes only the settlement fields; everything recorded before the game stays untouched. */
     void settle(ForwardPick settled);
 }

@@ -150,6 +150,33 @@ public class ForwardPickService {
                 threeWayFixtures.size(), skipped, written);
     }
 
+    /**
+     * The picks on record, newest day first, optionally narrowed. Read-only.
+     *
+     * <p>Unpaginated: the record grows by a handful of slips a day and is meant to be read whole —
+     * a forward test's value is the accumulation, not the last page of it.
+     */
+    @Transactional(readOnly = true)
+    public List<ForwardPick> picks(String algorithmCode, String userName, String status) {
+        return forwardPickRepository.findAll().stream()
+                .filter(pick -> algorithmCode == null || algorithmCode.isBlank()
+                        || algorithmCode.equals(pick.algorithmCode()))
+                .filter(pick -> userName == null || userName.isBlank()
+                        || userName.equals(pick.userName()))
+                .filter(pick -> status == null || status.isBlank()
+                        || status.equalsIgnoreCase(pick.status().name()))
+                .sorted(Comparator.comparing(ForwardPick::ymd).reversed()
+                        .thenComparing(ForwardPick::bucket)
+                        .thenComparing(ForwardPick::slipNo))
+                .toList();
+    }
+
+    /** Display name of the algorithm that produced a pick, for read models. */
+    public String algorithmName(String algorithmCode) {
+        PickAlgorithm algorithm = algorithmsByCode.get(algorithmCode);
+        return algorithm == null ? algorithmCode : algorithm.name();
+    }
+
     /** One {@code (ymd, 조합버킷)} slot per entry, in the order the day's games resolve. */
     private Map<String, List<BaseballResult>> slots(List<BaseballResult> fixtures) {
         Map<String, List<BaseballResult>> bySlot = PickUniverse.distinctFixtures(fixtures).stream()

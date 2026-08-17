@@ -50,8 +50,17 @@ class ForwardPickRepositoryImpl implements ForwardPickRepository {
 
     @Override
     public List<ForwardPick> findByAlgorithm(String algorithmCode, String userName) {
-        List<ForwardPickJpaEntity> picks =
-                pickRepository.findByAlgorithmCodeAndUserNameOrderByYmdAscIdAsc(algorithmCode, userName);
+        return withLegs(
+                pickRepository.findByAlgorithmCodeAndUserNameOrderByYmdAscIdAsc(algorithmCode, userName));
+    }
+
+    @Override
+    public List<ForwardPick> findAll() {
+        return withLegs(pickRepository.findAllByOrderByYmdAscIdAsc());
+    }
+
+    /** One extra query for every leg of the given picks, rather than one per pick. */
+    private List<ForwardPick> withLegs(List<ForwardPickJpaEntity> picks) {
         if (picks.isEmpty()) {
             return List.of();
         }

@@ -1,0 +1,87 @@
+.forward-picks {
+  padding: 24px 24px 0;
+  font-family: system-ui, sans-serif;
+  text-align: left;
+}
+
+.forward-picks__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.forward-picks__header h2 {
+  font-size: 18px;
+  margin: 0;
+}
+
+.forward-picks__header select {
+  font-size: 14px;
+  padding: 4px 8px;
+}
+
+.forward-picks__summary {
+  font-size: 13px;
+  color: #555;
+}
+
+.forward-picks__error {
+  color: #c0392b;
+}
+
+.forward-picks__empty {
+  font-size: 14px;
+  color: #888;
+  margin-top: 12px;
+}
+
+.forward-picks__table-wrap {
+  overflow-x: auto;
+  margin-top: 12px;
+}
+
+.forward-picks__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.forward-picks__table th,
+.forward-picks__table td {
+  border: 1px solid #ddd;
+  padding: 6px 10px;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.forward-picks__table th {
+  background: #f5f5f5;
+}
+
+.forward-picks__left {
+  text-align: left;
+}
+
+.forward-picks__pick {
+  font-weight: 600;
+  text-align: left;
+}
+
+.forward-picks__created {
+  font-size: 12px;
+  color: #555;
+}
+
+.forward-picks__row--hit td {
+  background: #f0fdf4;
+}
+
+.forward-picks__hit {
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.forward-picks__miss {
+  color: #dc2626;
+}

@@ -17,9 +17,6 @@ public record BaseballResultResponse(
         Double res2,
         String totalResult,
         Double totalDiv,
-        Double homeDiv,
-        Double drawDiv,
-        Double awayDiv,
         Double pubHomeDiv,
         Double pubDrawDiv,
         Double pubAwayDiv) {
@@ -40,9 +37,6 @@ public record BaseballResultResponse(
                 baseballResult.res2(),
                 baseballResult.totalResult(),
                 baseballResult.totalDiv(),
-                baseballResult.homeDiv(),
-                baseballResult.drawDiv(),
-                baseballResult.awayDiv(),
                 baseballResult.pubHomeDiv(),
                 baseballResult.pubDrawDiv(),
                 baseballResult.pubAwayDiv());

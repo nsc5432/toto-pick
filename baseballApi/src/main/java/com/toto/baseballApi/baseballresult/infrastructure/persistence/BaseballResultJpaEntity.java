@@ -59,15 +59,6 @@ class BaseballResultJpaEntity {
     @Column(name = "TOTAL_DIV", nullable = false)
     private Double totalDiv;
 
-    @Column(name = "HOME_DIV")
-    private Double homeDiv;
-
-    @Column(name = "DRAW_DIV")
-    private Double drawDiv;
-
-    @Column(name = "AWAY_DIV")
-    private Double awayDiv;
-
     @Column(name = "PUB_HOME_DIV")
     private Double pubHomeDiv;
 
@@ -76,14 +67,4 @@ class BaseballResultJpaEntity {
 
     @Column(name = "PUB_AWAY_DIV")
     private Double pubAwayDiv;
-
-    /**
-     * Package-private on purpose: the entity stays setter-free for the outside world;
-     * only the repository adapter in this package may apply computed odds.
-     */
-    void applyDivs(Double homeDiv, Double drawDiv, Double awayDiv) {
-        this.homeDiv = homeDiv;
-        this.drawDiv = drawDiv;
-        this.awayDiv = awayDiv;
-    }
 }

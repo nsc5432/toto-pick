@@ -13,7 +13,7 @@ class MarketPairIndexTest {
     private BaseballResult game(int id, int round, String gameType, String tm, String away) {
         return new BaseballResult(id, 2026, round, "KBO", "260630", tm, "A", away,
                 gameType, null, 0.0, null, "승", 1.5,
-                null, null, null, null, null, null);
+                null, null, null);
     }
 
     @Test

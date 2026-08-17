@@ -38,18 +38,14 @@ class WinRateOddsSlipSelectorTest {
 
     private BaseballResult twoWay(String ymd, String home, String away, String totalResult) {
         return new BaseballResult(nextId++, 2026, 76, "KBO", ymd, "18:30", home, away,
-                "야구 승패", null, 0.0, null, totalResult, 1.5, null, null, null, null, null, null);
+                "야구 승패", null, 0.0, null, totalResult, 1.5, null, null, null);
     }
 
-    /**
-     * Odds go into the published columns only; the backfilled {@code *_DIV} trio is left null so a
-     * selector that reached for them would pick nothing at all (설계 결정 D2).
-     */
+    /** Published odds are the only odds a selector may read (설계 결정 D2). */
     private BaseballResult threeWay(int id, String tournament, String home, String away,
             Double pubHomeDiv, Double pubAwayDiv) {
         return new BaseballResult(id, 2026, 76, tournament, "260630", "18:30", home, away,
-                "야구 승1패", null, 0.0, null, "승", 2.0, null, null, null,
-                pubHomeDiv, 5.0, pubAwayDiv);
+                "야구 승1패", null, 0.0, null, "승", 2.0, pubHomeDiv, 5.0, pubAwayDiv);
     }
 
     private SlipSelectionInput input(int combinedN, List<BaseballResult> history,

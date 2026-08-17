@@ -45,7 +45,6 @@ public record MatchSchedule(
         return new BaseballResult(
                 id, year, round, tournament, ymd, tm, home, away, gameType, cond,
                 null, null, null, null,
-                null, null, null,
                 pubHomeDiv, pubDrawDiv, pubAwayDiv);
     }
 }

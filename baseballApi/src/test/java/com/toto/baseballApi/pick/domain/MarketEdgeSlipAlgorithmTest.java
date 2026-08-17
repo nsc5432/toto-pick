@@ -23,7 +23,7 @@ class MarketEdgeSlipAlgorithmTest {
         for (int day = 1; day <= 10; day++) {
             games.add(new BaseballResult(nextId++, 2026, 76, "KBO",
                     String.format("2606%02d", day), "18:30", "A", "B",
-                    "야구 승패", null, 0.0, null, "승", 1.5, null, null, null, null, null, null));
+                    "야구 승패", null, 0.0, null, "승", 1.5, null, null, null));
         }
         return games;
     }
@@ -36,8 +36,7 @@ class MarketEdgeSlipAlgorithmTest {
     private BaseballResult pricedGame(Double pubHome, Double pubDraw, Double pubAway) {
         return new BaseballResult(1, 2026, 76, "KBO", "260630", "18:30", "A", "B",
                 "야구 승1패", null, 0.0, null, "승", 2.0,
-                // Backfilled columns deliberately left null: nothing may select on them (D2).
-                null, null, null, pubHome, pubDraw, pubAway);
+                pubHome, pubDraw, pubAway);
     }
 
     private SlipSelectionInput input(BaseballResult game, double edgeThreshold, double minOdds,

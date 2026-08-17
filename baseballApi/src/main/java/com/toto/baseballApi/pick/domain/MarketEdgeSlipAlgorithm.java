@@ -26,9 +26,11 @@ import com.toto.baseballApi.baseballresult.domain.ThreeWayOdds;
  * the non-draw probability mass, leaving the market's draw estimate untouched.
  *
  * <p>Prices come from {@link BaseballResult#publishedOdds()} — the odds as actually posted before
- * the game. The backfilled {@code *_DIV} columns must never feed a comparison like this one: only
- * the realized side of those holds a measured price, so an "edge" computed from them partly encodes
- * the result (docs/statistical-model-design.md, 설계 결정 D2).
+ * the game, and now the only odds a row offers before it is settled. Reconstructed {@code *_DIV}
+ * columns used to sit alongside them and would have fed a comparison like this one perfectly well,
+ * except that only their realized side held a measured price, so any "edge" computed from them partly
+ * encoded the result. They were removed rather than merely documented
+ * (docs/statistical-model-design.md, 설계 결정 D2).
  */
 public class MarketEdgeSlipAlgorithm implements TunableAlgorithm {
 

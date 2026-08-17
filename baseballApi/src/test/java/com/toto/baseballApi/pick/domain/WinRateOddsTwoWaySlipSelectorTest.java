@@ -31,13 +31,13 @@ class WinRateOddsTwoWaySlipSelectorTest {
             Double pubHome, Double pubDraw, Double pubAway) {
         return new BaseballResult(id, 2026, 76, "KBO", "260630", "18:30", home, away,
                 "야구 승1패", null, 0.0, null, "승", 2.0,
-                null, null, null, pubHome, pubDraw, pubAway);
+                pubHome, pubDraw, pubAway);
     }
 
     private BaseballResult twoWay(int id, String home, String away) {
         return new BaseballResult(id, 2026, 76, "KBO", "260630", "18:30", home, away,
                 "야구 승패", null, 0.0, null, "승", 1.6,
-                null, null, null, null, null, null);
+                null, null, null);
     }
 
     /**
@@ -57,7 +57,7 @@ class WinRateOddsTwoWaySlipSelectorTest {
                 history.add(new BaseballResult(id++, 2026, 70, "KBO",
                         String.format("2606%02d", game + 1), "18:30", "T" + wins, "O" + wins,
                         "야구 승패", null, 0.0, null, game < wins ? "승" : "패", 1.5,
-                        null, null, null, null, null, null));
+                        null, null, null));
             }
         }
         return history;
@@ -163,12 +163,12 @@ class WinRateOddsTwoWaySlipSelectorTest {
                 threeWay(1, STRONG, MID, 2.40, 3.30, 2.60),
                 new BaseballResult(2, 2026, 76, "MLB", "260630", "08:30", STRONG, MID,
                         "야구 승1패", null, 0.0, null, "승", 2.0,
-                        null, null, null, 2.40, 3.30, 2.60));
+                        2.40, 3.30, 2.60));
         List<BaseballResult> twoWayGames = List.of(
                 twoWay(101, STRONG, MID),
                 new BaseballResult(102, 2026, 76, "MLB", "260630", "08:30", STRONG, MID,
                         "야구 승패", null, 0.0, null, "승", 1.6,
-                        null, null, null, null, null, null));
+                        null, null, null));
 
         // One candidate per bucket, so a 2-leg slip cannot be formed in either.
         assertThat(algorithm.selectSlips(input(2, threeWayGames, twoWayGames))).isEmpty();

@@ -21,14 +21,14 @@ class FavoriteTwoWaySlipAlgorithmTest {
             Double pubHome, Double pubDraw, Double pubAway, String totalResult, Double totalDiv) {
         return new BaseballResult(id, 2026, 76, "KBO", "260630", "18:30", home, away,
                 "야구 승1패", null, 0.0, null, totalResult, totalDiv,
-                null, null, null, pubHome, pubDraw, pubAway);
+                pubHome, pubDraw, pubAway);
     }
 
     /** The 2-way listing of the same fixture: no published price, only what the winner paid. */
     private BaseballResult twoWay(int id, String home, String away, String totalResult, Double totalDiv) {
         return new BaseballResult(id, 2026, 76, "KBO", "260630", "18:30", home, away,
                 "야구 승패", null, 0.0, null, totalResult, totalDiv,
-                null, null, null, null, null, null);
+                null, null, null);
     }
 
     private SlipSelectionInput input(int combinedN,

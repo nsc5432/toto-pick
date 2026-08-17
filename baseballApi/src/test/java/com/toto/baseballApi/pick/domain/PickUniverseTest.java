@@ -13,7 +13,7 @@ class PickUniverseTest {
     private BaseballResult game(int id, int round, String tm, String home, String away, Double pubHome) {
         return new BaseballResult(id, 2026, round, "MLB", "260422", tm, home, away,
                 "야구 승1패", null, 0.0, null, "승", 1.7,
-                null, null, null, pubHome, 3.3, 1.7);
+                pubHome, 3.3, 1.7);
     }
 
     @Test

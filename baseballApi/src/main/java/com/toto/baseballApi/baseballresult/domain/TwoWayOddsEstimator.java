@@ -14,6 +14,10 @@ import java.math.RoundingMode;
  * a rule reading it partly learns the outcome. This estimator reads nothing but published pre-game
  * numbers, which makes the leak structurally impossible rather than a rule to remember.
  *
+ * <p>The 3-way row once carried reconstructed {@code HOME_DIV}/{@code DRAW_DIV}/{@code AWAY_DIV}
+ * columns that would have been the obvious shortcut here. They were removed for the same reason this
+ * class exists: reconstructing a price from the outcome is not the same thing as knowing it.
+ *
  * <p><strong>The formula.</strong> The 승1패 slots partition the same sample space the 승패 slots do —
  * a 1점차 game is a game one of the two teams won by exactly one run. So the outright win probability
  * is the 2+ run probability plus this side's share of the one-run mass:
@@ -48,8 +52,8 @@ import java.math.RoundingMode;
  * 24 published 승패 games (2026-08-14~15, MLB 15 / NPB 6 / KBO 3) {@code 1/승 + 1/패} averaged
  * 1.13629 with a range of 1.13516–1.13769 and sd ≈ 0.0007, independent of league and price level
  * (1.21/3.23 → 1.1360; 2.56/1.34 → 1.1369). It is a fixed house margin, the 2-way sibling of the
- * 3-way 1.15. Note this is materially tighter than the 1.14 that
- * {@code BaseballResultDivBackfillService} had reverse-engineered from realized payouts.
+ * 3-way 1.15. Note this is materially tighter than the 1.14 the old backfill had reverse-engineered
+ * from realized payouts — one more reason a published price beats a reconstructed one.
  *
  * <p><strong>This is a model, not a quote.</strong> The output is used for stake sizing and for the
  * market benchmark; payouts always settle at the real {@code TOTAL_DIV}. Sizing off a wrong price

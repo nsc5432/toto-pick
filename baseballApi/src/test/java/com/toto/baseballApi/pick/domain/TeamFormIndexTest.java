@@ -15,7 +15,7 @@ class TeamFormIndexTest {
 
     private BaseballResult twoWay(String ymd, String home, String away, String totalResult) {
         return new BaseballResult(nextId++, 2026, 76, "KBO", ymd, "18:30", home, away,
-                "야구 승패", null, 0.0, null, totalResult, 1.5, null, null, null, null, null, null);
+                "야구 승패", null, 0.0, null, totalResult, 1.5, null, null, null);
     }
 
     @Test

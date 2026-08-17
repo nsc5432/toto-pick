@@ -19,8 +19,8 @@ import com.toto.baseballApi.baseballresult.domain.FixtureKey;
  * inner loop. It is safe to build from the whole history because it maps identity, not results — no
  * lookup depends on a date, so there is nothing here for a day to see past.
  *
- * <p>The key is the fixture identity {@code (year, round, tournament, ymd, tm, home, away)}, matching
- * {@code BaseballResultDivBackfillService.matchKey}. It includes 회차 deliberately: the same fixture
+ * <p>The key is the fixture identity {@link FixtureKey} — {@code (year, round, tournament, ymd, tm,
+ * home, away)}, with no {@code gameType} so the two markets meet. It includes 회차 deliberately: the same fixture
  * is routinely listed in two consecutive 회차, and the 2-way row of the 회차 actually being picked is
  * the one whose price and settlement belong together.
  */

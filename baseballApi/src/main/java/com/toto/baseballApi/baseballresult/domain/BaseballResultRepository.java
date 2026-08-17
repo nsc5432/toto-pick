@@ -21,7 +21,4 @@ public interface BaseballResultRepository {
 
     List<BaseballResult> findByGameTypeAndTournamentsAndYmdBefore(
             String gameType, Collection<String> tournaments, String ymdExclusive);
-
-    /** Applies the given per-row odds and returns the number of rows actually updated. */
-    int updateDivs(List<DivUpdate> updates);
 }

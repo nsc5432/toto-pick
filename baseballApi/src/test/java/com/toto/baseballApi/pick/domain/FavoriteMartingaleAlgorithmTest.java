@@ -21,7 +21,7 @@ class FavoriteMartingaleAlgorithmTest {
             double pubHome, double pubDraw, double pubAway, String totalResult, Double totalDiv) {
         return new BaseballResult(id, 2026, 76, "KBO", ymd, "18:30", home, away,
                 "야구 승1패", null, 0.0, null, totalResult, totalDiv,
-                null, null, null, pubHome, pubDraw, pubAway);
+                pubHome, pubDraw, pubAway);
     }
 
     private SlipSelectionInput input(String ymd, List<BaseballResult> dayGames) {

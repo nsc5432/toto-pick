@@ -19,10 +19,13 @@ CREATE TABLE kbo.baseball_result (
     RES1          DOUBLE(5,2)   NOT NULL COMMENT '결과 1',
     RES2          DOUBLE(5,2)   DEFAULT NULL COMMENT '결과 2',
     TOTAL_RESULT  VARCHAR(5)    NOT NULL COMMENT '결과',
-    TOTAL_DIV     DOUBLE(5,2)   NOT NULL COMMENT '배당',
-    HOME_DIV      DOUBLE(5,2)   DEFAULT NULL,
-    DRAW_DIV      DOUBLE(5,2)   DEFAULT NULL,
-    AWAY_DIV      DOUBLE(5,2)   DEFAULT NULL,
+    TOTAL_DIV     DOUBLE(5,2)   NOT NULL COMMENT '실현된 면의 실측 배당 — 정산 지급의 근거',
+    -- 알고리즘이 배당을 읽는 유일한 통로 (BaseballResult.publishedOdds(), 설계 결정 D2).
+    -- 여기서 역산한 HOME_DIV/DRAW_DIV/AWAY_DIV 가 있었으나, 어느 면이 정확한지를 결과가 정하는
+    -- 구조라 제거했다 — alter_drop_backfilled_div.sql 참조.
+    PUB_HOME_DIV  DOUBLE(5,2)   DEFAULT NULL COMMENT '발표 홈승 배당(원시)',
+    PUB_DRAW_DIV  DOUBLE(5,2)   DEFAULT NULL COMMENT '발표 무(1점차) 배당(원시)',
+    PUB_AWAY_DIV  DOUBLE(5,2)   DEFAULT NULL COMMENT '발표 원정승 배당(원시)',
     PRIMARY KEY (id),
     UNIQUE KEY BASEBALL_RESULT_IDX01 (year, round, TOURNAMENT, YMD, TM, HOME, AWAY, GAME_TYPE, COND)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

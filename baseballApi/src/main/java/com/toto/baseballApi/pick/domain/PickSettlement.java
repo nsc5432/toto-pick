@@ -48,7 +48,8 @@ public final class PickSettlement {
      * rows were cross-checked against {@code totalDiv} and matched, so sizing off this number and
      * settling at {@code totalDiv} quote the same market — sizing off anything else can produce "hit
      * the slip, missed the target". {@code null} when any leg has no price at all; such a day is
-     * skipped rather than priced from the backfilled estimates (설계 결정 D2).
+     * skipped rather than priced from anything the row knows after the fact — pricing it from
+     * {@code totalDiv} would mean pricing it from the outcome (설계 결정 D2).
      */
     public static BigDecimal combinedBackedOdds(
             List<PickDetail> details, Map<Integer, BaseballResult> gamesById,

@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.toto.baseballApi.baseballresult.domain.BaseballResult;
+import com.toto.baseballApi.pick.domain.MarketPairIndex;
 import com.toto.baseballApi.pick.domain.TeamFormIndex;
 
 /**
@@ -24,10 +25,13 @@ import com.toto.baseballApi.pick.domain.TeamFormIndex;
  * @param history      2-way games sorted by ymd ascending, so any prefix is exactly the games before
  *                     a given day — never re-sort or re-order it
  * @param formIndex    team form over that same history, shared by every day and every candidate
+ * @param marketPairs  each picked 3-way game's 2-way ("야구 승패") counterpart, for algorithms that
+ *                     bet that market. Built from the range's own 2-way listings rather than from
+ *                     {@link #history()}, which deliberately stops before the last day
  */
 public record BacktestData(
         List<PickDay> days, List<PickDay> stakingSlots,
-        List<BaseballResult> history, TeamFormIndex formIndex) {
+        List<BaseballResult> history, TeamFormIndex formIndex, MarketPairIndex marketPairs) {
 
     /**
      * One selection unit — a day on the flat path, a slot on the staking path — pre-indexed for

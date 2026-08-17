@@ -16,6 +16,11 @@ import com.toto.baseballApi.baseballresult.domain.ThreeWayOdds;
  * published price of the realized side: every row carrying published odds was cross-checked against
  * {@code totalDiv} and matched (docs/statistical-model-design.md §9), so selection (on
  * {@code publishedOdds()}) and settlement quote the same market.
+ *
+ * <p>Everything except {@link #settle} needs the <em>pre-game</em> price of the backed side, which is
+ * a different question from what the winner paid. It normally comes from the game's own
+ * {@code publishedOdds()}; a leg may instead carry its own {@link BackedPrice} for rows that have no
+ * published quote — see {@link #priceOf}.
  */
 public final class PickSettlement {
 
@@ -38,23 +43,23 @@ public final class PickSettlement {
     }
 
     /**
-     * The combined published odds of the backed sides, rounded exactly like {@link #settle} rounds
-     * the realized combined odds (2 dp, ceiling). This is what a stake-sizing rule must quote:
-     * published rows were cross-checked against {@code totalDiv} and matched, so sizing off this
-     * number and settling at {@code totalDiv} quote the same market — sizing off anything else can
-     * produce "hit the slip, missed the target". {@code null} when any leg lacks published odds;
-     * such a day is skipped rather than priced from the backfilled estimates (설계 결정 D2).
+     * The combined pre-game odds of the backed sides, rounded exactly like {@link #settle} rounds the
+     * realized combined odds (2 dp, ceiling). This is what a stake-sizing rule must quote: published
+     * rows were cross-checked against {@code totalDiv} and matched, so sizing off this number and
+     * settling at {@code totalDiv} quote the same market — sizing off anything else can produce "hit
+     * the slip, missed the target". {@code null} when any leg has no price at all; such a day is
+     * skipped rather than priced from the backfilled estimates (설계 결정 D2).
      */
     public static BigDecimal combinedBackedOdds(
-            List<PickDetail> details, Map<Integer, BaseballResult> gamesById) {
+            List<PickDetail> details, Map<Integer, BaseballResult> gamesById,
+            Map<Integer, BackedPrice> pricesById) {
         BigDecimal combined = BigDecimal.ONE;
         for (PickDetail detail : details) {
-            BaseballResult game = gamesById.get(detail.resultId());
-            ThreeWayOdds odds = game == null ? null : game.publishedOdds();
-            if (odds == null) {
+            BackedPrice price = priceOf(detail, gamesById, pricesById);
+            if (price == null) {
                 return null;
             }
-            combined = combined.multiply(BigDecimal.valueOf(backedOdds(odds, detail.totalResult())));
+            combined = combined.multiply(BigDecimal.valueOf(price.odds()));
         }
         return combined.setScale(2, RoundingMode.CEILING);
     }
@@ -75,20 +80,24 @@ public final class PickSettlement {
      * actually attributable to the strategy, and it self-normalises across leg counts: more legs
      * lower both the return and the benchmark together.
      *
-     * <p>{@code null} when any leg lacks published odds, since a benchmark cannot be quoted for a
-     * price that was never observed.
+     * <p>Because {@code O} is the margin of whichever market the leg was quoted in, a 승패 leg is
+     * measured against the 2-way margin (≈13.6%) and a 승1패 leg against the 3-way one (≈15.2%) —
+     * which is the point: switching to a cheaper market is a real gain and has to show up as one.
+     *
+     * <p>{@code null} when any leg has no price, since a benchmark cannot be quoted for a price that
+     * was never observed.
      */
     public static BigDecimal marketExpectation(
-            List<PickDetail> details, Map<Integer, BaseballResult> gamesById, BigDecimal inputMoney) {
+            List<PickDetail> details, Map<Integer, BaseballResult> gamesById,
+            Map<Integer, BackedPrice> pricesById, BigDecimal inputMoney) {
         BigDecimal factor = BigDecimal.ONE;
         for (PickDetail detail : details) {
-            BaseballResult game = gamesById.get(detail.resultId());
-            ThreeWayOdds odds = game == null ? null : game.publishedOdds();
-            if (odds == null) {
+            BackedPrice price = priceOf(detail, gamesById, pricesById);
+            if (price == null) {
                 return null;
             }
             factor = factor.divide(
-                    BigDecimal.valueOf(1.0 + odds.overround()), 12, RoundingMode.HALF_UP);
+                    BigDecimal.valueOf(1.0 + price.overround()), 12, RoundingMode.HALF_UP);
         }
         return factor.multiply(inputMoney).setScale(0, RoundingMode.HALF_UP);
     }
@@ -96,11 +105,11 @@ public final class PickSettlement {
     /**
      * The same slip taken apart: each leg settled as a single bet of one unit, against the same
      * market benchmark. See {@link LegTally} for why the goal is measured here rather than on the
-     * slip. Legs without published odds are skipped, since neither side of the comparison exists
-     * for them.
+     * slip. Legs without a price are skipped, since neither side of the comparison exists for them.
      */
     public static LegTally legTally(
-            List<PickDetail> details, Map<Integer, BaseballResult> gamesById) {
+            List<PickDetail> details, Map<Integer, BaseballResult> gamesById,
+            Map<Integer, BackedPrice> pricesById) {
         int count = 0;
         int hitCount = 0;
         BigDecimal payoutTotal = BigDecimal.ZERO;
@@ -109,23 +118,49 @@ public final class PickSettlement {
 
         for (PickDetail detail : details) {
             BaseballResult game = gamesById.get(detail.resultId());
-            ThreeWayOdds odds = game == null ? null : game.publishedOdds();
-            if (odds == null) {
+            BackedPrice price = priceOf(detail, gamesById, pricesById);
+            if (price == null) {
                 continue;
             }
             count++;
             benchmarkTotal = benchmarkTotal.add(
                     BigDecimal.ONE.divide(
-                            BigDecimal.valueOf(1.0 + odds.overround()), 12, RoundingMode.HALF_UP));
+                            BigDecimal.valueOf(1.0 + price.overround()), 12, RoundingMode.HALF_UP));
             if (game.totalResult().equals(detail.totalResult())) {
                 hitCount++;
-                double payout = backedOdds(odds, detail.totalResult());
+                double payout = price.odds();
                 payoutTotal = payoutTotal.add(BigDecimal.valueOf(payout));
                 payoutSquareTotal = payoutSquareTotal.add(BigDecimal.valueOf(payout * payout));
             }
             // A losing leg contributes 0 to both sums, which is already correct.
         }
         return new LegTally(count, hitCount, payoutTotal, benchmarkTotal, payoutSquareTotal);
+    }
+
+    /**
+     * The pre-game price of this leg's backed side: whatever the algorithm attached, else the game's
+     * own published 3-way quote. {@code null} means "no price" — the caller skips the leg or the day.
+     *
+     * <p>The override exists because 2-way ("야구 승패") rows carry no {@code PUB_*} columns at all,
+     * so an algorithm betting that market prices its legs from the paired 3-way quote. Falling back
+     * to the row's own {@code totalDiv} instead would reintroduce 설계 결정 D2 exactly: only the
+     * realized side is measured there, so the price would partly encode the outcome.
+     */
+    private static BackedPrice priceOf(
+            PickDetail detail, Map<Integer, BaseballResult> gamesById,
+            Map<Integer, BackedPrice> pricesById) {
+        BaseballResult game = gamesById.get(detail.resultId());
+        if (game == null) {
+            return null;
+        }
+        BackedPrice supplied = pricesById == null ? null : pricesById.get(detail.resultId());
+        if (supplied != null) {
+            return supplied;
+        }
+        ThreeWayOdds odds = game.publishedOdds();
+        return odds == null
+                ? null
+                : new BackedPrice(backedOdds(odds, detail.totalResult()), odds.overround());
     }
 
     private static double backedOdds(ThreeWayOdds odds, String predicted) {

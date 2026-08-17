@@ -16,6 +16,7 @@ import com.toto.baseballApi.baseballresult.domain.BaseballResult;
 import com.toto.baseballApi.baseballresult.domain.BaseballResultRepository;
 import com.toto.baseballApi.pick.domain.AlgorithmParams;
 import com.toto.baseballApi.pick.domain.LegTally;
+import com.toto.baseballApi.pick.domain.MarketPairIndex;
 import com.toto.baseballApi.pick.domain.MartingaleStaking;
 import com.toto.baseballApi.pick.domain.PickAlgorithm;
 import com.toto.baseballApi.pick.domain.PickBacktester;
@@ -64,6 +65,13 @@ public class BacktestService {
                 .sorted(Comparator.comparing(BaseballResult::ymd).thenComparing(BaseballResult::tm))
                 .toList();
 
+        // The 2-way listings of the picked range itself. Separate from `history`, which stops
+        // strictly before endYmd because form must never see its own day — pairing has no such
+        // constraint (it maps fixture identity, not results), and the last day needs its pairs too.
+        MarketPairIndex marketPairs = MarketPairIndex.build(
+                baseballResultRepository.findByGameTypeAndTournamentsAndYmdBetween(
+                        PickUniverse.TWO_WAY_GAME_TYPE, PickUniverse.TOURNAMENTS, bgngYmd, endYmd));
+
         record DayKey(Integer year, Integer round, String ymd) {
         }
         Map<DayKey, List<BaseballResult>> gamesByDay = targetGames.stream()
@@ -73,7 +81,7 @@ public class BacktestService {
                 .sorted(Comparator.comparing(DayKey::ymd)
                         .thenComparing(DayKey::year)
                         .thenComparing(DayKey::round))
-                .map(key -> pickDay(key.ymd(), gamesByDay.get(key), history))
+                .map(key -> pickDay(key.ymd(), gamesByDay.get(key), history, marketPairs))
                 .toList();
 
         // The staking unit: one (ymd, 조합버킷) slot, ordered by the slot's earliest game time so
@@ -90,19 +98,28 @@ public class BacktestService {
                 .sorted(Comparator.comparing(SlotKey::ymd)
                         .thenComparing(key -> earliestTm(gamesBySlot.get(key)))
                         .thenComparing(SlotKey::bucket))
-                .map(key -> pickDay(key.ymd(), gamesBySlot.get(key), history))
+                .map(key -> pickDay(key.ymd(), gamesBySlot.get(key), history, marketPairs))
                 .toList();
 
-        return new BacktestData(days, stakingSlots, history, TeamFormIndex.build(history));
+        return new BacktestData(
+                days, stakingSlots, history, TeamFormIndex.build(history), marketPairs);
     }
 
     private BacktestData.PickDay pickDay(
-            String ymd, List<BaseballResult> games, List<BaseballResult> history) {
-        return new BacktestData.PickDay(
-                ymd, games,
-                games.stream().collect(Collectors.toMap(
-                        BaseballResult::id, Function.identity(), (a, b) -> a, LinkedHashMap::new)),
-                historyPrefixLength(history, ymd));
+            String ymd, List<BaseballResult> games, List<BaseballResult> history,
+            MarketPairIndex marketPairs) {
+        Map<Integer, BaseballResult> gamesById = games.stream().collect(Collectors.toMap(
+                BaseballResult::id, Function.identity(), (a, b) -> a, LinkedHashMap::new));
+
+        // Settlement resolves a leg by result id, so a 2-way algorithm's legs — which point at the
+        // 승패 row rather than the 승1패 one it was selected from — have to be resolvable here too.
+        for (BaseballResult game : games) {
+            BaseballResult pair = marketPairs.pairOf(game);
+            if (pair != null) {
+                gamesById.putIfAbsent(pair.id(), pair);
+            }
+        }
+        return new BacktestData.PickDay(ymd, games, gamesById, historyPrefixLength(history, ymd));
     }
 
     private static String earliestTm(List<BaseballResult> games) {
@@ -159,7 +176,7 @@ public class BacktestService {
         SlipSelectionInput input = new SlipSelectionInput(
                 day.ymd(), settings.num(), settings.x(), settings.y(), settings.combinedN(),
                 day.games(), day.priorHistory(data.history()), data.formIndex(),
-                AlgorithmParams.empty()).withParams(params);
+                data.marketPairs(), AlgorithmParams.empty()).withParams(params);
 
         List<SettledSlip> slips = staking == null
                 ? PickBacktester.runDay(algorithm, input, day.gamesById(), settings.inputMoney())

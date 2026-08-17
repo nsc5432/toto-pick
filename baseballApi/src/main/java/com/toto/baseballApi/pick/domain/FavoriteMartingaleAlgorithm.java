@@ -58,7 +58,8 @@ public class FavoriteMartingaleAlgorithm implements StakingAlgorithm, TunableAlg
     public List<PickSlip> selectSlips(SlipSelectionInput input) {
         SlipSelectionInput forced = new SlipSelectionInput(
                 input.ymd(), input.num(), input.x(), input.y(), MARTINGALE_COMBINED_N,
-                input.dayGames(), input.historyGames(), input.formIndex(), input.params());
+                input.dayGames(), input.historyGames(), input.formIndex(), input.marketPairs(),
+                input.params());
         List<PickSlip> slips = delegate.selectSlips(forced);
         return slips.isEmpty() ? List.of() : List.of(slips.get(0));
     }

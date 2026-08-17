@@ -14,6 +14,7 @@ import com.toto.baseballApi.baseballresult.domain.BaseballResult;
 import com.toto.baseballApi.baseballresult.domain.BaseballResultRepository;
 import com.toto.baseballApi.baseballresult.domain.DivBackfillResult;
 import com.toto.baseballApi.baseballresult.domain.DivUpdate;
+import com.toto.baseballApi.baseballresult.domain.TwoWayOddsEstimator;
 
 import lombok.RequiredArgsConstructor;
 
@@ -46,8 +47,15 @@ public class BaseballResultDivBackfillService {
 
     /** 3-way overround: 1/승 + 1/무 + 1/패, verified from published odds. */
     private static final double THREE_WAY_OVERROUND = 1.15;
-    /** 2-way overround: 1/승 + 1/패, estimated from realized payouts. */
-    private static final double TWO_WAY_OVERROUND = 1.14;
+    /**
+     * 2-way overround: 1/승 + 1/패. Measured directly from 24 published 승패 games
+     * (2026-08-14~15, MLB 15 / NPB 6 / KBO 3): mean 1.13629, range 1.13516–1.13769, sd ≈ 0.0007,
+     * flat across leagues and price levels. This replaces the earlier 1.14, which had been
+     * reverse-engineered from realized payouts and ran ~0.4% high. See
+     * {@link com.toto.baseballApi.baseballresult.domain.TwoWayOddsEstimator}, which holds the same
+     * constant for the pre-game direction (3-way published price → 2-way price).
+     */
+    private static final double TWO_WAY_OVERROUND = TwoWayOddsEstimator.PUBLISHED_OVERROUND;
     /** Observed DRAW odds span 2.34–4.15; estimates outside this range become NULL. */
     private static final double DRAW_DIV_MIN = 2.0;
     private static final double DRAW_DIV_MAX = 9.9;

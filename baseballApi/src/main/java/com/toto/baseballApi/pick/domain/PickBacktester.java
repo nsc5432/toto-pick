@@ -2,6 +2,7 @@ package com.toto.baseballApi.pick.domain;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -29,8 +30,7 @@ public final class PickBacktester {
         List<PickSlip> slips = algorithm.selectSlips(input);
         List<SettledSlip> settled = new ArrayList<>(slips.size());
         for (PickSlip slip : slips) {
-            List<PickDetail> details = toDetails(slip);
-            settled.add(settle(details, dayGamesById, inputMoney));
+            settled.add(settle(slip, dayGamesById, inputMoney));
         }
         return settled;
     }
@@ -43,7 +43,7 @@ public final class PickBacktester {
      * <p>A slot is one {@code (ymd, PickUniverse#combinationBucket)} pair — the games that may share
      * a slip and that all resolve before the next slot starts. Only the algorithm's first slip is
      * considered: a staking algorithm bets one slip per slot by design (R2), since same-slot games
-     * run concurrently. An empty return means "no bet" (no slip or no published odds) and leaves the
+     * run concurrently. An empty return means "no bet" (no slip or no usable price) and leaves the
      * session untouched. Slots must be fed in chronological order — the fold is what makes the
      * martingale path real, so the caller must not parallelize or reorder slots within one session.
      */
@@ -55,13 +55,16 @@ public final class PickBacktester {
         if (slips.isEmpty()) {
             return List.of();
         }
-        List<PickDetail> details = toDetails(slips.get(0));
-        BigDecimal combinedOdds = PickSettlement.combinedBackedOdds(details, slotGamesById);
+        PickSlip slip = slips.get(0);
+        List<PickDetail> details = toDetails(slip);
+        Map<Integer, BackedPrice> prices = pricesOf(slip);
+        BigDecimal combinedOdds =
+                PickSettlement.combinedBackedOdds(details, slotGamesById, prices);
         BigDecimal stake = staking.nextStake(combinedOdds);
         if (stake == null) {
             return List.of();
         }
-        SettledSlip settled = settle(details, slotGamesById, stake);
+        SettledSlip settled = settle(slip, slotGamesById, stake);
         staking.settle(stake, settled.hit());
         return List.of(settled);
     }
@@ -72,12 +75,28 @@ public final class PickBacktester {
                 .toList();
     }
 
+    /**
+     * The prices the algorithm attached to its own legs, if any. Empty for every algorithm betting
+     * the 3-way market, which lets settlement read the price off the game itself.
+     */
+    private static Map<Integer, BackedPrice> pricesOf(PickSlip slip) {
+        Map<Integer, BackedPrice> prices = new LinkedHashMap<>();
+        for (PickSelection selection : slip.selections()) {
+            if (selection.price() != null) {
+                prices.put(selection.resultId(), selection.price());
+            }
+        }
+        return prices;
+    }
+
     private static SettledSlip settle(
-            List<PickDetail> details, Map<Integer, BaseballResult> dayGamesById, BigDecimal stake) {
+            PickSlip slip, Map<Integer, BaseballResult> dayGamesById, BigDecimal stake) {
+        List<PickDetail> details = toDetails(slip);
+        Map<Integer, BackedPrice> prices = pricesOf(slip);
         return new SettledSlip(
                 details, stake,
                 PickSettlement.settle(details, dayGamesById, stake),
-                PickSettlement.marketExpectation(details, dayGamesById, stake),
-                PickSettlement.legTally(details, dayGamesById));
+                PickSettlement.marketExpectation(details, dayGamesById, prices, stake),
+                PickSettlement.legTally(details, dayGamesById, prices));
     }
 }

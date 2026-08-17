@@ -5,6 +5,8 @@ import org.springframework.context.annotation.Configuration;
 
 import com.toto.baseballApi.pick.domain.FavoriteMartingaleAlgorithm;
 import com.toto.baseballApi.pick.domain.FavoriteOddsSlipAlgorithm;
+import com.toto.baseballApi.pick.domain.FavoriteTwoWayMartingaleAlgorithm;
+import com.toto.baseballApi.pick.domain.FavoriteTwoWaySlipAlgorithm;
 import com.toto.baseballApi.pick.domain.MarketEdgeSlipAlgorithm;
 import com.toto.baseballApi.pick.domain.PickAlgorithm;
 import com.toto.baseballApi.pick.domain.WinRateOddsSlipSelector;
@@ -36,5 +38,15 @@ class PickAlgorithmConfig {
     @Bean
     PickAlgorithm favoriteMartingaleAlgorithm() {
         return new FavoriteMartingaleAlgorithm();
+    }
+
+    @Bean
+    PickAlgorithm favoriteTwoWayAlgorithm() {
+        return new FavoriteTwoWaySlipAlgorithm();
+    }
+
+    @Bean
+    PickAlgorithm favoriteTwoWayMartingaleAlgorithm() {
+        return new FavoriteTwoWayMartingaleAlgorithm();
     }
 }

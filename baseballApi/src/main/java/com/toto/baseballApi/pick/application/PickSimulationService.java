@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.toto.baseballApi.baseballresult.domain.BaseballResult;
 import com.toto.baseballApi.baseballresult.domain.BaseballResultRepository;
 import com.toto.baseballApi.pick.domain.AlgorithmParams;
+import com.toto.baseballApi.pick.domain.MarketPairIndex;
 import com.toto.baseballApi.pick.domain.MartingaleStaking;
 import com.toto.baseballApi.pick.domain.PickAlgorithm;
 import com.toto.baseballApi.pick.domain.PickBacktester;
@@ -95,6 +96,14 @@ public class PickSimulationService {
         List<BaseballResult> historyGames = baseballResultRepository.findByGameTypeAndTournamentsAndYmdBefore(
                 PickUniverse.TWO_WAY_GAME_TYPE, PickUniverse.TOURNAMENTS, command.endYmd());
 
+        // The 2-way listings of the picked range itself. Separate from historyGames, which stops
+        // strictly before endYmd because form must never see its own day — pairing has no such
+        // constraint (it maps fixture identity, not results), and the last day needs its pairs too.
+        MarketPairIndex marketPairs = MarketPairIndex.build(
+                baseballResultRepository.findByGameTypeAndTournamentsAndYmdBetween(
+                        PickUniverse.TWO_WAY_GAME_TYPE, PickUniverse.TOURNAMENTS,
+                        command.bgngYmd(), command.endYmd()));
+
         List<PickUnit> flatUnits = flatUnits(targetGames);
         List<PickUnit> stakingUnits = stakingUnits(targetGames);
 
@@ -105,7 +114,7 @@ public class PickSimulationService {
                 .map(algorithm -> runAlgorithm(
                         algorithm,
                         algorithm instanceof StakingAlgorithm ? stakingUnits : flatUnits,
-                        historyGames, formIndex, command))
+                        historyGames, formIndex, marketPairs, command))
                 .toList();
         return new SimulationResult(runs);
     }
@@ -168,7 +177,7 @@ public class PickSimulationService {
 
     private SimulationResult.AlgorithmRun runAlgorithm(
             PickAlgorithm algorithm, List<PickUnit> units, List<BaseballResult> historyGames,
-            TeamFormIndex formIndex, SimulatePicksCommand command) {
+            TeamFormIndex formIndex, MarketPairIndex marketPairs, SimulatePicksCommand command) {
         int dayCount = 0;
         int slipCount = 0;
         int hitCount = 0;
@@ -183,7 +192,7 @@ public class PickSimulationService {
 
         for (PickUnit unit : units) {
             DayTotals totals = simulateDay(
-                    algorithm, unit, historyGames, formIndex, command, staking);
+                    algorithm, unit, historyGames, formIndex, marketPairs, command, staking);
             dayCount++;
             slipCount += totals.slipCount();
             hitCount += totals.hitCount();
@@ -200,19 +209,29 @@ public class PickSimulationService {
 
     private DayTotals simulateDay(
             PickAlgorithm algorithm, PickUnit unit,
-            List<BaseballResult> historyGames, TeamFormIndex formIndex, SimulatePicksCommand command,
-            MartingaleStaking staking) {
+            List<BaseballResult> historyGames, TeamFormIndex formIndex, MarketPairIndex marketPairs,
+            SimulatePicksCommand command, MartingaleStaking staking) {
         // Rolling window: only games strictly before this day feed the win-rate ranking.
         List<BaseballResult> priorGames = historyGames.stream()
                 .filter(g -> g.ymd().compareTo(unit.ymd()) < 0)
                 .toList();
 
         Map<Integer, BaseballResult> dayGamesById = unit.games().stream()
-                .collect(Collectors.toMap(BaseballResult::id, Function.identity()));
+                .collect(Collectors.toMap(
+                        BaseballResult::id, Function.identity(), (a, b) -> a, LinkedHashMap::new));
+
+        // Settlement resolves a leg by result id, so a 2-way algorithm's legs — which point at the
+        // 승패 row rather than the 승1패 one it was selected from — have to be resolvable here too.
+        for (BaseballResult game : unit.games()) {
+            BaseballResult pair = marketPairs.pairOf(game);
+            if (pair != null) {
+                dayGamesById.putIfAbsent(pair.id(), pair);
+            }
+        }
 
         SlipSelectionInput input = new SlipSelectionInput(
                 unit.ymd(), command.num(), command.x(), command.y(), command.combinedN(),
-                unit.games(), priorGames, formIndex, AlgorithmParams.empty());
+                unit.games(), priorGames, formIndex, marketPairs, AlgorithmParams.empty());
         List<SettledSlip> slips = staking == null
                 ? PickBacktester.runDay(algorithm, input, dayGamesById, command.inputMoney())
                 : PickBacktester.runStakedSlot(

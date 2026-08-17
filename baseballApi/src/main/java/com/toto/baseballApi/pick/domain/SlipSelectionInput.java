@@ -21,6 +21,9 @@ import com.toto.baseballApi.baseballresult.domain.BaseballResult;
  * @param formIndex    team form as of any date, built once per run and shared across days. It spans
  *                     the whole history rather than this day's slice, and is safe precisely because
  *                     every lookup names the date it must not see past — pass {@code ymd}
+ * @param marketPairs  each {@code dayGames} entry's 2-way ("야구 승패") counterpart, for algorithms
+ *                     that bet that market instead. Built once per run; empty for runs that have no
+ *                     use for it
  * @param params       the algorithm's own knobs for this run; empty outside a parameter search
  */
 public record SlipSelectionInput(
@@ -32,23 +35,26 @@ public record SlipSelectionInput(
         List<BaseballResult> dayGames,
         List<BaseballResult> historyGames,
         TeamFormIndex formIndex,
+        MarketPairIndex marketPairs,
         AlgorithmParams params) {
 
     public SlipSelectionInput {
         formIndex = formIndex == null ? TeamFormIndex.empty() : formIndex;
+        marketPairs = marketPairs == null ? MarketPairIndex.empty() : marketPairs;
         params = params == null ? AlgorithmParams.empty() : params;
     }
 
     /**
-     * Untuned input that derives its own form index from {@code historyGames}. Convenient for a
-     * one-off call, but building the index per day is what a search must avoid — a sweep should
-     * build it once and pass it to the full constructor.
+     * Untuned input that derives its own form index and market pairing from {@code historyGames}.
+     * Convenient for a one-off call, but building these per day is what a search must avoid — a
+     * sweep should build them once and pass them to the full constructor.
      */
     public SlipSelectionInput(
             String ymd, int num, double x, double y, int combinedN,
             List<BaseballResult> dayGames, List<BaseballResult> historyGames) {
         this(ymd, num, x, y, combinedN, dayGames, historyGames,
-                TeamFormIndex.build(historyGames), AlgorithmParams.empty());
+                TeamFormIndex.build(historyGames), MarketPairIndex.build(historyGames),
+                AlgorithmParams.empty());
     }
 
     /**
@@ -66,6 +72,7 @@ public record SlipSelectionInput(
                 dayGames,
                 historyGames,
                 formIndex,
+                marketPairs,
                 resolved);
     }
 }

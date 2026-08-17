@@ -8,16 +8,20 @@ import java.util.List;
  *
  * <p>Delegates selection to {@link FavoriteOddsSlipAlgorithm} pinned at {@code combinedN=2} and
  * keeps only the first slip — the delegate sorts candidates by odds ascending and chunks, so the
- * first slip is the two lowest-odds legs, i.e. the day's highest-probability combination. One slip
- * per day is a hard rule (R2): same-day games run concurrently, so a second slip could never be
- * sized off the first one's outcome.
+ * first slip is the two lowest-odds legs, i.e. the slot's highest-probability combination. One slip
+ * per slot is a hard rule (R2): games within a slot run concurrently, so a second slip could never
+ * be sized off the first one's outcome.
  *
- * <p>The stake itself is not computed here — selection must stay day-isolated. The evaluator holds
- * a {@link MartingaleStaking} session (via {@link #newStakingSession}) and folds it over the days.
+ * <p>The evaluator feeds one {@code (ymd, PickUniverse#combinationBucket)} slot at a time, so
+ * {@code input.dayGames()} already holds only games that may share a slip — this class never has to
+ * check tournaments itself.
  *
- * <p>{@code targetProfit} is the swept knob: what one hit must clear after recovering the round's
- * losses. Larger targets scale every stake up proportionally, reaching the 50,000원 round budget in
- * fewer misses — the sweep is exactly the target-vs-bust-probability trade-off.
+ * <p>The stake itself is not computed here — selection must stay slot-isolated. The evaluator holds
+ * a {@link MartingaleStaking} session (via {@link #newStakingSession}) and folds it over the slots.
+ *
+ * <p>{@code targetProfit} is the swept knob: what one hit must clear after recovering the sequence's
+ * losses. Larger targets scale every stake up proportionally, reaching the 50,000원 sequence budget
+ * in fewer misses — the sweep is exactly the target-vs-bust-probability trade-off.
  */
 public class FavoriteMartingaleAlgorithm implements StakingAlgorithm, TunableAlgorithm {
 

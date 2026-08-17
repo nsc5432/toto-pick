@@ -16,23 +16,29 @@ import com.toto.baseballApi.pick.domain.TeamFormIndex;
  * turning "games before this day" into a {@code subList} view rather than a fresh filter pass per
  * day per candidate.
  *
- * @param history   2-way games sorted by ymd ascending, so any prefix is exactly the games before a
- *                  given day — never re-sort or re-order it
- * @param formIndex team form over that same history, shared by every day and every candidate
+ * @param days         flat-path units: one per {@code (year, round, ymd)}, in ymd order
+ * @param stakingSlots staking-path units: one per {@code (ymd, PickUniverse#combinationBucket)}, in
+ *                     chronological order. Kept as a separate list rather than replacing
+ *                     {@link #days()} so that changing the staking unit cannot move a flat
+ *                     algorithm's numbers — the two paths must stay comparable across the ledger
+ * @param history      2-way games sorted by ymd ascending, so any prefix is exactly the games before
+ *                     a given day — never re-sort or re-order it
+ * @param formIndex    team form over that same history, shared by every day and every candidate
  */
 public record BacktestData(
-        List<PickDay> days, List<BaseballResult> history, TeamFormIndex formIndex) {
+        List<PickDay> days, List<PickDay> stakingSlots,
+        List<BaseballResult> history, TeamFormIndex formIndex) {
 
     /**
-     * One pick day, pre-indexed for settlement.
+     * One selection unit — a day on the flat path, a slot on the staking path — pre-indexed for
+     * settlement.
      *
      * @param historyPrefixLength how many entries of {@link BacktestData#history()} fall strictly
      *                            before this day — the boundary that keeps a backtest from seeing
-     *                            its own future
+     *                            its own future. Both slots of one ymd share it, and correctly so:
+     *                            neither may see any game of its own day
      */
     public record PickDay(
-            Integer year,
-            Integer round,
             String ymd,
             List<BaseballResult> games,
             Map<Integer, BaseballResult> gamesById,
@@ -43,7 +49,11 @@ public record BacktestData(
         }
     }
 
-    /** Distinct pick days in chronological order — what a train/validation split is cut on. */
+    /**
+     * Distinct pick days in chronological order — what a train/validation split is cut on. Taken
+     * from {@link #days()} only: both lists cover the same ymds, and cutting every path on the same
+     * boundary is what keeps a staking candidate comparable to a flat one.
+     */
     public List<String> distinctYmds() {
         return days.stream().map(PickDay::ymd).distinct().toList();
     }

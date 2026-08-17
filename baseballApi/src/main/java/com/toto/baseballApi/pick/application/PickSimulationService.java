@@ -64,6 +64,18 @@ public class PickSimulationService {
     private record DayKey(Integer year, Integer round, String ymd) {
     }
 
+    /** The staking path's unit: one ymd × one combination bucket (docs/martingale-staking-design.md §3). */
+    private record SlotKey(String ymd, String bucket) {
+    }
+
+    /**
+     * One selection unit: the games an algorithm sees at once. Flat algorithms get a
+     * {@link DayKey} group, staking algorithms a {@link SlotKey} group — the two groupings must stay
+     * separate so that switching the staking unit cannot move a flat algorithm's numbers.
+     */
+    private record PickUnit(String ymd, List<BaseballResult> games) {
+    }
+
     @Transactional
     public SimulationResult simulate(SimulatePicksCommand command) {
         if (command.bgngYmd().compareTo(command.endYmd()) > 0) {
@@ -83,22 +95,60 @@ public class PickSimulationService {
         List<BaseballResult> historyGames = baseballResultRepository.findByGameTypeAndTournamentsAndYmdBefore(
                 PickUniverse.TWO_WAY_GAME_TYPE, PickUniverse.TOURNAMENTS, command.endYmd());
 
-        Map<DayKey, List<BaseballResult>> gamesByDay = targetGames.stream()
-                .collect(Collectors.groupingBy(g -> new DayKey(g.year(), g.round(), g.ymd())));
-        List<DayKey> dayKeys = gamesByDay.keySet().stream()
-                .sorted(Comparator.comparing(DayKey::ymd)
-                        .thenComparing(DayKey::year)
-                        .thenComparing(DayKey::round))
-                .toList();
+        List<PickUnit> flatUnits = flatUnits(targetGames);
+        List<PickUnit> stakingUnits = stakingUnits(targetGames);
 
         // Built once for the whole run — per-day rebuilds would re-sort the full history every day.
         TeamFormIndex formIndex = TeamFormIndex.build(historyGames);
 
         List<SimulationResult.AlgorithmRun> runs = algorithms.stream()
                 .map(algorithm -> runAlgorithm(
-                        algorithm, dayKeys, gamesByDay, historyGames, formIndex, command))
+                        algorithm,
+                        algorithm instanceof StakingAlgorithm ? stakingUnits : flatUnits,
+                        historyGames, formIndex, command))
                 .toList();
         return new SimulationResult(runs);
+    }
+
+    /** Flat path: one unit per {@code (year, round, ymd)}, in ymd order. */
+    private List<PickUnit> flatUnits(List<BaseballResult> targetGames) {
+        Map<DayKey, List<BaseballResult>> gamesByDay = targetGames.stream()
+                .collect(Collectors.groupingBy(g -> new DayKey(g.year(), g.round(), g.ymd())));
+        return gamesByDay.keySet().stream()
+                .sorted(Comparator.comparing(DayKey::ymd)
+                        .thenComparing(DayKey::year)
+                        .thenComparing(DayKey::round))
+                .map(key -> new PickUnit(key.ymd(), gamesByDay.get(key)))
+                .toList();
+    }
+
+    /**
+     * Staking path: one unit per {@code (ymd, 조합버킷)}, ordered by ymd and then by the slot's
+     * earliest game time. Sorting on the actual times rather than hard-coding "MLB first" keeps the
+     * fold honest if the schedule ever puts a bucket somewhere else in the day.
+     *
+     * <p>A slot spans 회차, so it must be deduplicated: the same game listed in two 회차 would
+     * otherwise be offered to the algorithm twice and could fill both legs of one slip.
+     */
+    private List<PickUnit> stakingUnits(List<BaseballResult> targetGames) {
+        Map<SlotKey, List<BaseballResult>> gamesBySlot =
+                PickUniverse.distinctFixtures(targetGames).stream()
+                        .collect(Collectors.groupingBy(g -> new SlotKey(
+                                g.ymd(), PickUniverse.combinationBucket(g.tournament()))));
+        return gamesBySlot.keySet().stream()
+                .sorted(Comparator.comparing(SlotKey::ymd)
+                        .thenComparing(key -> earliestTm(gamesBySlot.get(key)))
+                        .thenComparing(SlotKey::bucket))
+                .map(key -> new PickUnit(key.ymd(), gamesBySlot.get(key)))
+                .toList();
+    }
+
+    private static String earliestTm(List<BaseballResult> games) {
+        return games.stream()
+                .map(BaseballResult::tm)
+                .filter(tm -> tm != null)
+                .min(Comparator.naturalOrder())
+                .orElse("");
     }
 
     private List<PickAlgorithm> resolveAlgorithms(List<String> codes) {
@@ -117,8 +167,7 @@ public class PickSimulationService {
     }
 
     private SimulationResult.AlgorithmRun runAlgorithm(
-            PickAlgorithm algorithm, List<DayKey> dayKeys,
-            Map<DayKey, List<BaseballResult>> gamesByDay, List<BaseballResult> historyGames,
+            PickAlgorithm algorithm, List<PickUnit> units, List<BaseballResult> historyGames,
             TeamFormIndex formIndex, SimulatePicksCommand command) {
         int dayCount = 0;
         int slipCount = 0;
@@ -132,9 +181,9 @@ public class PickSimulationService {
                 ? stakingAlgorithm.newStakingSession(AlgorithmParams.empty())
                 : null;
 
-        for (DayKey day : dayKeys) {
+        for (PickUnit unit : units) {
             DayTotals totals = simulateDay(
-                    algorithm, day, gamesByDay.get(day), historyGames, formIndex, command, staking);
+                    algorithm, unit, historyGames, formIndex, command, staking);
             dayCount++;
             slipCount += totals.slipCount();
             hitCount += totals.hitCount();
@@ -150,33 +199,38 @@ public class PickSimulationService {
     }
 
     private DayTotals simulateDay(
-            PickAlgorithm algorithm, DayKey day, List<BaseballResult> dayGames,
+            PickAlgorithm algorithm, PickUnit unit,
             List<BaseballResult> historyGames, TeamFormIndex formIndex, SimulatePicksCommand command,
             MartingaleStaking staking) {
         // Rolling window: only games strictly before this day feed the win-rate ranking.
         List<BaseballResult> priorGames = historyGames.stream()
-                .filter(g -> g.ymd().compareTo(day.ymd()) < 0)
+                .filter(g -> g.ymd().compareTo(unit.ymd()) < 0)
                 .toList();
 
-        Map<Integer, BaseballResult> dayGamesById = dayGames.stream()
+        Map<Integer, BaseballResult> dayGamesById = unit.games().stream()
                 .collect(Collectors.toMap(BaseballResult::id, Function.identity()));
 
         SlipSelectionInput input = new SlipSelectionInput(
-                day.ymd(), command.num(), command.x(), command.y(), command.combinedN(),
-                dayGames, priorGames, formIndex, AlgorithmParams.empty());
+                unit.ymd(), command.num(), command.x(), command.y(), command.combinedN(),
+                unit.games(), priorGames, formIndex, AlgorithmParams.empty());
         List<SettledSlip> slips = staking == null
                 ? PickBacktester.runDay(algorithm, input, dayGamesById, command.inputMoney())
-                : PickBacktester.runStakedDay((StakingAlgorithm) algorithm, input, dayGamesById,
-                        day.year(), day.round(), staking);
+                : PickBacktester.runStakedSlot(
+                        (StakingAlgorithm) algorithm, input, dayGamesById, staking);
 
         int hits = 0;
         BigDecimal inputSum = BigDecimal.ZERO;
         BigDecimal outputSum = BigDecimal.ZERO;
         for (SettledSlip slip : slips) {
+            // year/round come off the slip's own legs rather than the loop key: a staking slot spans
+            // whatever 회차 the day's games belong to, while a flat unit is a single (year, round)
+            // group — so reading the leg gives the same value there and the right one here.
+            BaseballResult firstLeg = dayGamesById.get(slip.details().get(0).resultId());
+
             // slip.inputMoney() is the actual stake: the flat request amount on the flat path, the
             // martingale-sized stake on the staked path — pick_mstr.input_money stores either as-is.
             pickMasterRepository.save(new PickMaster(
-                    null, day.year(), day.round(), day.ymd(),
+                    null, firstLeg.year(), firstLeg.round(), unit.ymd(),
                     SIMULATION_USER_NAME, algorithm.code(), slip.inputMoney(), slip.outputMoney(),
                     slip.details()));
 

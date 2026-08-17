@@ -38,31 +38,31 @@ public final class PickBacktester {
     /**
      * The staked counterpart of {@link #runDay}: the stake comes from the algorithm's own
      * {@link MartingaleStaking} session instead of a flat {@code inputMoney}, and the session is
-     * told the outcome so the next day's stake sees it.
+     * told the outcome so the next slot's stake sees it.
      *
-     * <p>Only the algorithm's first slip is considered — a staking algorithm bets one slip per day
-     * by design (R2). An empty return means "no bet today" (no slip, no published odds, or the
-     * round budget is spent) and leaves the session untouched. Days must be fed in ymd order:
-     * the fold is what makes the martingale path real, so the caller must not parallelize or
-     * reorder days within one session.
+     * <p>A slot is one {@code (ymd, PickUniverse#combinationBucket)} pair — the games that may share
+     * a slip and that all resolve before the next slot starts. Only the algorithm's first slip is
+     * considered: a staking algorithm bets one slip per slot by design (R2), since same-slot games
+     * run concurrently. An empty return means "no bet" (no slip or no published odds) and leaves the
+     * session untouched. Slots must be fed in chronological order — the fold is what makes the
+     * martingale path real, so the caller must not parallelize or reorder slots within one session.
      */
-    public static List<SettledSlip> runStakedDay(
+    public static List<SettledSlip> runStakedSlot(
             StakingAlgorithm algorithm, SlipSelectionInput input,
-            Map<Integer, BaseballResult> dayGamesById,
-            Integer year, Integer round, MartingaleStaking staking) {
+            Map<Integer, BaseballResult> slotGamesById, MartingaleStaking staking) {
 
         List<PickSlip> slips = algorithm.selectSlips(input);
         if (slips.isEmpty()) {
             return List.of();
         }
         List<PickDetail> details = toDetails(slips.get(0));
-        BigDecimal combinedOdds = PickSettlement.combinedBackedOdds(details, dayGamesById);
-        BigDecimal stake = staking.nextStake(year, round, combinedOdds);
+        BigDecimal combinedOdds = PickSettlement.combinedBackedOdds(details, slotGamesById);
+        BigDecimal stake = staking.nextStake(combinedOdds);
         if (stake == null) {
             return List.of();
         }
-        SettledSlip settled = settle(details, dayGamesById, stake);
-        staking.settle(year, round, stake, settled.hit());
+        SettledSlip settled = settle(details, slotGamesById, stake);
+        staking.settle(stake, settled.hit());
         return List.of(settled);
     }
 

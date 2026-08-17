@@ -1,6 +1,6 @@
 .pick-slip-list {
-  max-width: 1100px;
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
   padding: 24px 24px 0;
   font-family: system-ui, sans-serif;
   text-align: left;

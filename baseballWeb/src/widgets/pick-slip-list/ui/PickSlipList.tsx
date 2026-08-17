@@ -19,6 +19,18 @@ interface PickSlipListProps {
 
 const ALL = "__ALL__";
 
+/** 슬립에 포함된 각 레그의 배당을 곱한 최종 배당. 배당이 없는 레그가 하나라도 있으면 계산 불가. */
+function combinedOdds(legs: PickSlipLeg[]): number | null {
+  let product = 1;
+  for (const leg of legs) {
+    if (leg.backedOdds === null) {
+      return null;
+    }
+    product *= leg.backedOdds;
+  }
+  return product;
+}
+
 /** 픽/결과("승"·"1"·"패")를 해당 팀 이름으로 풀어쓴다. */
 function sideLabel(side: string | null, leg: PickSlipLeg): string {
   if (side === "승") {
@@ -132,16 +144,19 @@ export function PickSlipList({ query, refreshKey }: PickSlipListProps) {
                 <th>경기</th>
                 <th>픽</th>
                 <th>배당</th>
+                <th>최종배당</th>
                 <th>경기결과</th>
                 <th>레그</th>
                 <th>투입금액</th>
+                <th>예상적중금액</th>
                 <th>회수금액</th>
                 <th>적중</th>
               </tr>
             </thead>
             <tbody>
-              {visibleSlips.map((slip) =>
-                slip.legs.map((leg, legIndex) => (
+              {visibleSlips.map((slip) => {
+                const slipCombinedOdds = combinedOdds(slip.legs);
+                return slip.legs.map((leg, legIndex) => (
                   <tr
                     key={`${slip.id}-${leg.resultId}`}
                     className={slip.hit ? "pick-slip-list__row--hit" : undefined}
@@ -162,6 +177,11 @@ export function PickSlipList({ query, refreshKey }: PickSlipListProps) {
                     </td>
                     <td className="pick-slip-list__pick-cell">{sideLabel(leg.predicted, leg)}</td>
                     <td>{leg.backedOdds === null ? "-" : leg.backedOdds.toFixed(2)}</td>
+                    {legIndex === 0 && (
+                      <td rowSpan={slip.legs.length} className="pick-slip-list__combined-odds-cell">
+                        {slipCombinedOdds === null ? "-" : slipCombinedOdds.toFixed(2)}
+                      </td>
+                    )}
                     <td>{sideLabel(leg.actualResult, leg)}</td>
                     <td
                       className={
@@ -173,6 +193,14 @@ export function PickSlipList({ query, refreshKey }: PickSlipListProps) {
                     {legIndex === 0 && (
                       <>
                         <td rowSpan={slip.legs.length}>{formatMoney(slip.inputMoney)}</td>
+                        <td rowSpan={slip.legs.length}>
+                          {formatMoney(
+                            slipCombinedOdds === null
+                              ? null
+                              : Math.round(slip.inputMoney * slipCombinedOdds),
+                            "-",
+                          )}
+                        </td>
                         <td rowSpan={slip.legs.length}>{formatMoney(slip.outputMoney)}</td>
                         <td
                           rowSpan={slip.legs.length}
@@ -185,8 +213,8 @@ export function PickSlipList({ query, refreshKey }: PickSlipListProps) {
                       </>
                     )}
                   </tr>
-                )),
-              )}
+                ));
+              })}
             </tbody>
           </table>
         </div>

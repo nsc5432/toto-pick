@@ -69,22 +69,48 @@ public class BacktestService {
         Map<DayKey, List<BaseballResult>> gamesByDay = targetGames.stream()
                 .collect(Collectors.groupingBy(g -> new DayKey(g.year(), g.round(), g.ymd())));
 
-        List<DayKey> dayKeys = gamesByDay.keySet().stream()
+        List<BacktestData.PickDay> days = gamesByDay.keySet().stream()
                 .sorted(Comparator.comparing(DayKey::ymd)
                         .thenComparing(DayKey::year)
                         .thenComparing(DayKey::round))
+                .map(key -> pickDay(key.ymd(), gamesByDay.get(key), history))
                 .toList();
 
-        List<BacktestData.PickDay> days = new ArrayList<>(dayKeys.size());
-        for (DayKey key : dayKeys) {
-            List<BaseballResult> games = gamesByDay.get(key);
-            days.add(new BacktestData.PickDay(
-                    key.year(), key.round(), key.ymd(), games,
-                    games.stream().collect(Collectors.toMap(
-                            BaseballResult::id, Function.identity(), (a, b) -> a, LinkedHashMap::new)),
-                    historyPrefixLength(history, key.ymd())));
+        // The staking unit: one (ymd, 조합버킷) slot, ordered by the slot's earliest game time so
+        // the martingale fold follows the schedule instead of a hard-coded "MLB first". A slot spans
+        // 회차, so it is deduplicated — the same game listed in two 회차 must not fill both legs.
+        record SlotKey(String ymd, String bucket) {
         }
-        return new BacktestData(days, history, TeamFormIndex.build(history));
+        Map<SlotKey, List<BaseballResult>> gamesBySlot =
+                PickUniverse.distinctFixtures(targetGames).stream()
+                        .collect(Collectors.groupingBy(g -> new SlotKey(
+                                g.ymd(), PickUniverse.combinationBucket(g.tournament()))));
+
+        List<BacktestData.PickDay> stakingSlots = gamesBySlot.keySet().stream()
+                .sorted(Comparator.comparing(SlotKey::ymd)
+                        .thenComparing(key -> earliestTm(gamesBySlot.get(key)))
+                        .thenComparing(SlotKey::bucket))
+                .map(key -> pickDay(key.ymd(), gamesBySlot.get(key), history))
+                .toList();
+
+        return new BacktestData(days, stakingSlots, history, TeamFormIndex.build(history));
+    }
+
+    private BacktestData.PickDay pickDay(
+            String ymd, List<BaseballResult> games, List<BaseballResult> history) {
+        return new BacktestData.PickDay(
+                ymd, games,
+                games.stream().collect(Collectors.toMap(
+                        BaseballResult::id, Function.identity(), (a, b) -> a, LinkedHashMap::new)),
+                historyPrefixLength(history, ymd));
+    }
+
+    private static String earliestTm(List<BaseballResult> games) {
+        return games.stream()
+                .map(BaseballResult::tm)
+                .filter(tm -> tm != null)
+                .min(Comparator.naturalOrder())
+                .orElse("");
     }
 
     /** Index of the first history game on or after {@code ymd} — i.e. how many strictly precede it. */
@@ -113,8 +139,11 @@ public class BacktestService {
                 ? stakingAlgorithm.newStakingSession(params)
                 : null;
 
+        // A staking algorithm is folded over slots, not days — one ymd can contribute two of them.
+        List<BacktestData.PickDay> units = staking == null ? data.days() : data.stakingSlots();
+
         List<DayOutcome> outcomes = new ArrayList<>();
-        for (BacktestData.PickDay day : data.days()) {
+        for (BacktestData.PickDay day : units) {
             if (!window.contains(day.ymd())) {
                 continue;
             }
@@ -134,8 +163,8 @@ public class BacktestService {
 
         List<SettledSlip> slips = staking == null
                 ? PickBacktester.runDay(algorithm, input, day.gamesById(), settings.inputMoney())
-                : PickBacktester.runStakedDay((StakingAlgorithm) algorithm, input, day.gamesById(),
-                        day.year(), day.round(), staking);
+                : PickBacktester.runStakedSlot(
+                        (StakingAlgorithm) algorithm, input, day.gamesById(), staking);
 
         int hits = 0;
         BigDecimal inputTotal = BigDecimal.ZERO;

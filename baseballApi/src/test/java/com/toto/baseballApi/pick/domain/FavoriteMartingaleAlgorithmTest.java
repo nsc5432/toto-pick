@@ -39,7 +39,7 @@ class FavoriteMartingaleAlgorithmTest {
 
         List<PickSlip> slips = algorithm.selectSlips(input("260630", games));
 
-        // 4개 후보 중 최저 배당 2개(1.5, 1.8)만 — 하루 1슬립, 2게임 조합 강제 (R2).
+        // 4개 후보 중 최저 배당 2개(1.5, 1.8)만 — 슬롯당 1슬립, 2게임 조합 강제 (R2).
         assertThat(slips).hasSize(1);
         assertThat(slips.get(0).selections()).containsExactly(
                 new PickSelection(1, "승"), new PickSelection(2, "승"));
@@ -50,11 +50,11 @@ class FavoriteMartingaleAlgorithmTest {
         MartingaleStaking session = algorithm.newStakingSession(
                 AlgorithmParams.empty().with(FavoriteMartingaleAlgorithm.TARGET_PROFIT, 2000));
         // 2000 ÷ (4−1) = 666.7 → 700원.
-        assertThat(session.nextStake(2026, 76, BigDecimal.valueOf(4.0))).isEqualByComparingTo("700");
+        assertThat(session.nextStake(BigDecimal.valueOf(4.0))).isEqualByComparingTo("700");
     }
 
     @Test
-    void runStakedDayFoldsMissesIntoTheNextDaysStake() {
+    void runStakedSlotFoldsMissesIntoTheNextSlotsStake() {
         MartingaleStaking staking = algorithm.newStakingSession(AlgorithmParams.empty());
 
         // Day 1: favorites at 1.5/1.8 → combined 2.70; stake 1000÷1.7 = 588.2 → 600원. 홈팀 하나가
@@ -62,8 +62,8 @@ class FavoriteMartingaleAlgorithmTest {
         List<BaseballResult> day1 = List.of(
                 game(1, "260701", "A", "B", 1.5, 4.0, 5.0, "패", 5.0),
                 game(2, "260701", "C", "D", 1.8, 3.8, 3.6, "승", 1.8));
-        List<SettledSlip> settled1 = PickBacktester.runStakedDay(
-                algorithm, input("260701", day1), byId(day1), 2026, 76, staking);
+        List<SettledSlip> settled1 = PickBacktester.runStakedSlot(
+                algorithm, input("260701", day1), byId(day1), staking);
 
         assertThat(settled1).hasSize(1);
         assertThat(settled1.get(0).inputMoney()).isEqualByComparingTo("600");
@@ -74,8 +74,8 @@ class FavoriteMartingaleAlgorithmTest {
         List<BaseballResult> day2 = List.of(
                 game(3, "260702", "E", "F", 1.5, 4.0, 5.0, "승", 1.5),
                 game(4, "260702", "G", "H", 1.8, 3.8, 3.6, "승", 1.8));
-        List<SettledSlip> settled2 = PickBacktester.runStakedDay(
-                algorithm, input("260702", day2), byId(day2), 2026, 76, staking);
+        List<SettledSlip> settled2 = PickBacktester.runStakedSlot(
+                algorithm, input("260702", day2), byId(day2), staking);
 
         assertThat(settled2).hasSize(1);
         assertThat(settled2.get(0).inputMoney()).isEqualByComparingTo("950");
